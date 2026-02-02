@@ -3,20 +3,25 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 
+// Theme Import
+import 'core/theme/app_theme.dart';
+
 // Feature Imports
-import 'app.dart';
+// import 'features/shared/screens/public_home_page.dart'; // Not needed here anymore, Splash handles navigation
+import 'features/shared/screens/splash_screen.dart'; // Ensure this path matches where you put the file
+
 import 'features/auth/logic/auth_controller.dart';
-import 'features/member/logic/beneficiary_controller.dart'; // <--- NEW IMPORT
+import 'features/member/logic/beneficiary_controller.dart';
 
 // Repository Interface Imports
 import 'data/repositories/interfaces/auth_repository.dart';
 import 'data/repositories/interfaces/member_repository.dart';
-import 'data/repositories/interfaces/beneficiary_repository.dart'; // <--- NEW IMPORT
+import 'data/repositories/interfaces/beneficiary_repository.dart';
 
 // Repository Implementation Imports
 import 'data/repositories/impl/auth_repository_firebase.dart';
 import 'data/repositories/impl/member_repository_firestore.dart';
-import 'data/repositories/impl/beneficiary_repository_firestore.dart'; // <--- NEW IMPORT
+import 'data/repositories/impl/beneficiary_repository_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,7 +44,7 @@ void main() async {
         // 2. Inject Member Repository (Firestore)
         Provider<MemberRepository>(create: (_) => MemberRepositoryFirestore()),
 
-        // 3. Inject Beneficiary Repository (Firestore) <-- NEW
+        // 3. Inject Beneficiary Repository (Firestore)
         Provider<BeneficiaryRepository>(
           create: (_) => BeneficiaryRepositoryFirestore(),
         ),
@@ -52,7 +57,7 @@ void main() async {
           ),
         ),
 
-        // 5. Inject Beneficiary Controller (Depends on Beneficiary & Auth Repos) <-- NEW
+        // 5. Inject Beneficiary Controller (Depends on Beneficiary & Auth Repos)
         ChangeNotifierProvider<BeneficiaryController>(
           create: (context) => BeneficiaryController(
             repo: context.read<BeneficiaryRepository>(),
@@ -63,4 +68,23 @@ void main() async {
       child: const MyApp(),
     ),
   );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Dharma Yodha',
+      debugShowCheckedModeBanner: false,
+
+      // ✅ APPLY THE SAFFRON THEME
+      theme: AppTheme.lightTheme,
+
+      // ✅ START WITH SPLASH SCREEN
+      // The Splash Screen will automatically navigate to PublicHomePage after 3 seconds
+      home: const SplashScreen(),
+    );
+  }
 }
