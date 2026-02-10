@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 
-// ✅ UNCOMMENT or ADD the correct import for your Home Page
-import 'public_home_page.dart';
+// ✅ Core Imports
+import '../../../core/constants/colors.dart';
+import 'public_home_page.dart'; // Ensure path is correct
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,11 +18,13 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     // ⏳ Wait 3 seconds, then Navigate
-    Timer(const Duration(seconds: 2), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const PublicHomePage()),
-      );
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const PublicHomePage()),
+        );
+      }
     });
   }
 
@@ -31,13 +34,14 @@ class _SplashScreenState extends State<SplashScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
+      // We don't use backgroundColor here because the Container gradient covers it
       body: SafeArea(
         top: true,
         bottom: false,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 🔶 1. Gradient Background
+            // 🔶 1. Gradient Background (Updated to use AppColors)
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -45,9 +49,9 @@ class _SplashScreenState extends State<SplashScreen> {
                   end: Alignment.bottomCenter,
                   stops: [0.0, 0.44, 0.88],
                   colors: [
-                    Color(0xFFFFA05C),
-                    Color(0xFFFFDB8E),
-                    Color(0xFFFFE8B7),
+                    AppColors.primary, // Top: Saffron
+                    Color(0xFFFFDB8E), // Mid: Bridge Color
+                    AppColors.primaryLight, // Bottom: Cream
                   ],
                 ),
               ),
@@ -64,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: Opacity(
                 opacity: 0.3, // Your requested opacity
                 child: Image.asset(
-                  'assets/images/saffron_flag_bg.png',
+                  'assets/images/saffron_flag_bg.png', // Ensure this file exists
                   fit: BoxFit.cover,
                   alignment: Alignment.topLeft,
                 ),
@@ -85,13 +89,15 @@ class _SplashScreenState extends State<SplashScreen> {
                         ..style = PaintingStyle.stroke
                         ..strokeWidth =
                             3 // ✅ Kept your stroke weight
-                        ..color = const Color(0xEEEEEEEE),
-                      shadows: [
+                        ..color = AppColors.white.withValues(
+                          alpha: 0.9,
+                        ), // ✅ Using AppColors
+                      shadows: const [
                         Shadow(
-                          offset: const Offset(2, 4),
+                          offset: Offset(2, 4),
                           blurRadius: 10,
                           color: Colors.black26,
-                        ), // Safe opacity method
+                        ),
                       ],
                     ),
                   ),
@@ -101,7 +107,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     style: GoogleFonts.anekDevanagari(
                       fontSize: 64, // ✅ Kept your size
                       fontWeight: FontWeight.bold,
-                      color: const Color.fromARGB(255, 255, 143, 31),
+                      color: AppColors.primary, // ✅ Using AppColors.primary
                     ),
                   ),
                 ],

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // <--- Import added
+import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 
 class AppTheme {
@@ -7,58 +7,44 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
 
-      // Global Colors
-      primaryColor: AppColors.primary,
-      scaffoldBackgroundColor:
-          AppColors.background, // Cream background globally
-      // ✅ TEXT THEME: Anek Devanagari applied globally
-      textTheme: GoogleFonts.anekDevanagariTextTheme()
-          .apply(
-            bodyColor:
-                AppColors.textPrimary, // Applies to bodyLarge, bodyMedium, etc.
-            displayColor:
-                AppColors.textPrimary, // Applies to headlines, titles, etc.
-          )
-          .copyWith(
-            // We can still override specific styles if needed, merging with the font
-            titleLarge: GoogleFonts.anekDevanagari(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.bold,
-              fontSize: 22, // Standardizing title size
-            ),
-          ),
-
-      // AppBar Theme (Transparent with Brown Text)
-      appBarTheme: AppBarTheme(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-        titleTextStyle: GoogleFonts.anekDevanagari(
-          // Ensure AppBar uses the font too
-          color: AppColors.textPrimary,
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-        ),
+      // 1. GLOBAL COLORS
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.primary,
+        primary: AppColors.primary,
+        secondary: AppColors.primaryDark,
+        surface: AppColors.white,
+        error: AppColors.error,
       ),
 
-      // Button Theme (Saffron Background, White Text)
+      // 2. BACKGROUND
+      // We set this to your Cream color so screens without the gradient
+      // still look correct (instead of stark white).
+      scaffoldBackgroundColor: AppColors.primaryLight,
+
+      // 3. TYPOGRAPHY (Anek Devanagari Everywhere)
+      textTheme: GoogleFonts.anekDevanagariTextTheme().apply(
+        bodyColor: AppColors.textPrimary,
+        displayColor: AppColors.textPrimary,
+      ),
+
+      // 4. BUTTON THEME (Matches your "Login/Register" button)
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.white,
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: GoogleFonts.anekDevanagari(
-            // Font for buttons
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10), // Your rounded corners
           ),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+          textStyle: GoogleFonts.anekDevanagari(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
 
-      // Input Field Theme (White box with Orange border)
+      // 5. INPUT THEME (Matches your Login Fields)
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.white,
@@ -68,18 +54,20 @@ class AppTheme {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.fieldBorder),
+          borderSide: const BorderSide(color: Colors.black12),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.fieldBorder),
+          borderSide: const BorderSide(color: Colors.black12),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.primary, width: 2),
         ),
-        labelStyle: const TextStyle(color: AppColors.textSecondary),
       ),
+
+      // 6. ICON THEME
+      iconTheme: const IconThemeData(color: AppColors.primary),
     );
   }
 }

@@ -2,13 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-
-// Theme Import
-import 'core/theme/app_theme.dart';
-
-// Feature Imports
-// import 'features/shared/screens/public_home_page.dart'; // Not needed here anymore, Splash handles navigation
-import 'features/shared/screens/splash_screen.dart'; // Ensure this path matches where you put the file
+import 'app.dart';
 
 import 'features/auth/logic/auth_controller.dart';
 import 'features/member/logic/beneficiary_controller.dart';
@@ -68,23 +62,4 @@ void main() async {
       child: const MyApp(),
     ),
   );
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Dharma Yodha',
-      debugShowCheckedModeBanner: false,
-
-      // ✅ APPLY THE SAFFRON THEME
-      theme: AppTheme.lightTheme,
-
-      // ✅ START WITH SPLASH SCREEN
-      // The Splash Screen will automatically navigate to PublicHomePage after 3 seconds
-      home: const SplashScreen(),
-    );
-  }
 }

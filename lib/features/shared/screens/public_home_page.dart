@@ -1,135 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/gradient_background.dart';
-import '../../../core/widgets/dharma_app_bar.dart'; // ✅ Import New App Bar
-import '/../core/enums/app_bar_type.dart';
+import '../../../core/widgets/dharma_app_bar.dart';
+import '../../../core/enums/app_bar_type.dart';
+import 'package:member_management_app/features/member/screens/member_login_page.dart'; // Adjust path as needed
 
 class PublicHomePage extends StatelessWidget {
   const PublicHomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final bool isDesktop = size.width > 600;
-
     return Scaffold(
-      extendBodyBehindAppBar: true, // 🔥 KEY LINE
+      extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
 
-      // ✅ NEW: Use the Global App Bar here
       appBar: DharmaAppBar(
         type: DharmaAppBarType.publicHome,
         onPrimaryAction: () {
-          Navigator.pushNamed(context, '/login');
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MemberLoginScreen()),
+          );
         },
       ),
 
-      // Body wrapped in Gradient
       body: GradientBackground(
         child: SingleChildScrollView(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
             bottom: 20,
-
-            // 🔥 KEY FIX: push content below AppBar + status bar
+            // ✅ space below AppBar + 25px gap
             top: kToolbarHeight + MediaQuery.of(context).padding.top + 30,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- 1. ABOUT MISSION CARD ---
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                  border: Border.all(color: Colors.grey.withOpacity(0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "About Our Mission",
-                      style: GoogleFonts.anekDevanagari(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      "Dharma Yodha is a revolutionary movement for the society. We are dedicated to providing support, funds, and unity to our community members in times of need.",
-                      style: GoogleFonts.anekDevanagari(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
-                ),
+              // ===============================
+              // 1. MOTTO / HERO SECTION
+              // ===============================
+              _buildMottoSection(),
+              const SizedBox(height: 10),
+
+              // ===============================
+              // 2. ABOUT OUR MISSION
+              // ===============================
+              _buildMissionCard(),
+              const SizedBox(height: 25),
+
+              // ===============================
+              // 3. STATS (VERTICAL CARDS)
+              // ===============================
+              _buildStatCard(
+                icon: Icons.groups,
+                value: "1250+",
+                label: "TOTAL MEMBERS",
               ),
+              const SizedBox(height: 15),
 
-              const SizedBox(height: 30),
+              _buildStatCard(
+                icon: Icons.favorite,
+                value: "145",
+                label: "HELP CASES SOLVED",
+              ),
+              const SizedBox(height: 15),
 
-              // --- 2. STATS CARDS ---
-              isDesktop
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: _buildStatCard(
-                            Icons.groups,
-                            "1250+",
-                            "TOTAL MEMBERS",
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: _buildStatCard(
-                            Icons.favorite,
-                            "145",
-                            "HELP CASES SOLVED",
-                          ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: _buildStatCard(
-                            Icons.savings,
-                            "₹2,50,000+",
-                            "FUNDS DISTRIBUTED",
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _buildStatCard(Icons.groups, "1250+", "TOTAL MEMBERS"),
-                        const SizedBox(height: 15),
-                        _buildStatCard(
-                          Icons.favorite,
-                          "145",
-                          "HELP CASES SOLVED",
-                        ),
-                        const SizedBox(height: 15),
-                        _buildStatCard(
-                          Icons.savings,
-                          "₹2,50,000+",
-                          "FUNDS DISTRIBUTED",
-                        ),
-                      ],
-                    ),
+              _buildStatCard(
+                icon: Icons.savings,
+                value: "₹2,50,000+",
+                label: "FUNDS DISTRIBUTED",
+              ),
+              const SizedBox(height: 25),
 
-              const SizedBox(height: 40),
+              // ===============================
+              // 4. CONTACT / ASSISTANCE
+              // ===============================
+              _buildContactCard(),
+              const SizedBox(height: 15),
 
-              // --- 3. FOOTER ---
+              // ===============================
+              // 5. FOOTER (SOCIAL PLACEHOLDER)
+              // ===============================
               _buildFooter(),
             ],
           ),
@@ -138,41 +91,98 @@ class PublicHomePage extends StatelessWidget {
     );
   }
 
-  // ... (Keep your helper methods _buildStatCard and _buildFooter below)
+  // ======================================================
+  // MOTTO SECTION
+  // ======================================================
+  Widget _buildMottoSection() {
+    return Column(
+      children: [
+        Stack(
+          children: [
+            Text(
+              "धर्म के साथ, समाज के लिए",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anekDevanagari(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                // height: 1.0, // Optional: Tries to remove default padding, but Transform is safer
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 1
+                  ..color = const Color.fromARGB(255, 252, 125, 6),
+              ),
+            ),
+            Text(
+              "धर्म के साथ, समाज के लिए",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anekDevanagari(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: const Color.fromARGB(255, 255, 255, 255),
+              ),
+            ),
+          ],
+        ),
+        // 1. Removed SizedBox(height: 2) entirely
 
-  Widget _buildStatCard(IconData icon, String value, String label) {
+        // 2. Used Transform.translate to pull this text upwards
+        Transform.translate(
+          offset: const Offset(
+            0,
+            -5,
+          ), // Negative Y value moves it UP by 8 pixels
+          child: Text(
+            "एक ऐसा समुदाय जो संकट में साथ खड़ा होता है",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.anekDevanagari(
+              fontSize: 12,
+              height:
+                  1.2, // Reduced from 1.4 to tighten the text itself slightly
+              color: AppColors.textPrimary.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ======================================================
+  // ABOUT MISSION CARD
+  // ======================================================
+  Widget _buildMissionCard() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 15),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 8,
+            color: Colors.black26,
+            blurRadius: 3,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.white, size: 40),
-          const SizedBox(height: 10),
           Text(
-            value,
+            "About Our Mission",
             style: GoogleFonts.anekDevanagari(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
+              color: AppColors.primary,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 1),
           Text(
-            label,
+            "Dharma Yodha is a revolutionary movement for the Hindu society. "
+            "We are dedicated to providing support, funds, and unity to our "
+            "community members in times of need.",
             style: GoogleFonts.anekDevanagari(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontSize: 13,
+              height: 1.5,
+              color: AppColors.textPrimary,
             ),
           ),
         ],
@@ -180,19 +190,168 @@ class PublicHomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter() {
+  // ======================================================
+  // STAT CARD (VERTICAL)
+  // ======================================================
+  Widget _buildStatCard({
+    required IconData icon,
+    required String value,
+    required String label,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(
+        vertical: 20,
+        horizontal: 15,
+      ), // Added horizontal padding
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          // ... Your Footer Content
-          const Text("Footer Placeholder"),
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(13),
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 3, offset: Offset(0, 4)),
         ],
       ),
+      child: Row(
+        children: [
+          // 1. Fixed sized spacing for the icon
+          const SizedBox(width: 10),
+
+          Icon(icon, color: Colors.white, size: 50),
+
+          // 2. Expanded forces the Column to take all remaining space
+          Expanded(
+            child: Transform.translate(
+              offset: const Offset(8, 6),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    value,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.anekDevanagari(
+                      fontSize: 25,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                      height: 1.0, // Optional: Reduces internal font padding
+                    ),
+                  ),
+
+                  // ✅ FIX: Remove SizedBox and wrap the second text in Transform
+                  Transform.translate(
+                    offset: const Offset(0, -1), // Moves text UP by 5 pixels
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.anekDevanagari(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Optional: Add a dummy SizedBox here if you want to balance the icon's width
+          // on the right side to make it mathematically centered, but usually
+          // Expanded is enough.
+          const SizedBox(width: 10),
+        ],
+      ),
+    );
+  }
+
+  // ======================================================
+  // CONTACT / ASSISTANCE CARD
+  // ======================================================
+  Widget _buildContactCard() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3D5B0),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "For further assistance please contact us -",
+            style: GoogleFonts.anekDevanagari(fontSize: 14),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: const [
+              Icon(Icons.call, size: 18),
+              SizedBox(width: 10),
+              Text("9743847498"),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: const [
+              Icon(Icons.email, size: 18),
+              SizedBox(width: 10),
+              Text("gupta.vaibhav9313@gmail.com"),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "**This app is made for the benefit of only Hindu community**",
+            style: GoogleFonts.anekDevanagari(
+              fontSize: 9,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ======================================================
+  // FOOTER
+  // ======================================================
+  Widget _buildFooter() {
+    const Color iconColor = Color(0xFFFF9641);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // YouTube
+        IconButton(
+          icon: const FaIcon(FontAwesomeIcons.youtube),
+          color: iconColor, // Official YouTube Red
+          iconSize: 25,
+          onPressed: () {},
+        ),
+        const SizedBox(width: 4),
+
+        // Facebook
+        IconButton(
+          icon: const FaIcon(FontAwesomeIcons.facebook),
+          color: iconColor, // Official Facebook Blue
+          iconSize: 25,
+          onPressed: () {},
+        ),
+        const SizedBox(width: 4),
+
+        // Instagram
+        IconButton(
+          icon: const FaIcon(FontAwesomeIcons.instagram),
+          color: iconColor, // Official Insta Pink/Red
+          iconSize: 25,
+          onPressed: () {},
+        ),
+        const SizedBox(width: 4),
+
+        // X (formerly Twitter)
+        IconButton(
+          icon: const FaIcon(FontAwesomeIcons.xTwitter),
+          color: iconColor, // Official X Black
+          iconSize: 25,
+          onPressed: () {},
+        ),
+      ],
     );
   }
 }
