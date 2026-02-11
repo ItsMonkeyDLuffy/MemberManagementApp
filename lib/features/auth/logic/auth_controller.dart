@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/interfaces/auth_repository.dart';
-import '../../../data/repositories/interfaces/member_repository.dart'; // <--- Import this
+import '../../../data/repositories/interfaces/member_repository.dart';
 
 class AuthController extends ChangeNotifier {
   final AuthRepository _authRepository;
-  final MemberRepository _memberRepository; // <--- Add Member Repo
+  final MemberRepository _memberRepository;
 
-  // Dependency Injection: Controller gets both repositories
   AuthController({
     required AuthRepository authRepository,
     required MemberRepository memberRepository, // <--- Add this argument
   }) : _authRepository = authRepository,
-       _memberRepository = memberRepository;
+       _memberRepository = memberRepository; // <--- Correct assignment
 
   bool _isLoading = false;
   String? _verificationId;
@@ -48,8 +47,12 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // Step 2: UI calls this to verify
-  Future<void> verifyOtp(String otp, VoidCallback onSuccess) async {
+  // ✅ Step 2: UI calls this to verify
+  // CHANGED: onSuccess now accepts a bool (isExistingUser)
+  Future<void> verifyOtp(
+    String otp,
+    Function(bool isExisting) onSuccess,
+  ) async {
     if (_verificationId == null) return;
 
     _isLoading = true;
@@ -76,7 +79,11 @@ class AuthController extends ChangeNotifier {
 
         _isLoading = false;
         notifyListeners();
-        onSuccess(); // Login Success -> Navigate to Dashboard
+
+        // ✅ CALL CALLBACK WITH RESULT
+        // True = Existing User -> Dashboard
+        // False = New User -> Registration Step 1
+        onSuccess(exists);
       } else {
         _errorMessage = "Login Failed";
         _isLoading = false;

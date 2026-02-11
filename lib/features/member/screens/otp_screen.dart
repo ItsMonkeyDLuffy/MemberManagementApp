@@ -9,6 +9,10 @@ import '../../../core/widgets/dharma_app_bar.dart';
 import '../../../core/enums/app_bar_type.dart';
 import '../../../core/widgets/gradient_background.dart';
 
+// ✅ Import the destination screens
+import '../../member/screens/new_member_registration/personal_info_screen.dart';
+// import '../../member/screens/member_home_screen.dart'; // Uncomment when created
+
 class OtpScreen extends StatefulWidget {
   final String mobileNumber;
   const OtpScreen({super.key, required this.mobileNumber});
@@ -20,17 +24,35 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final TextEditingController _otpController = TextEditingController();
 
+  // ✅ Helper method to handle navigation based on registration status
+  void _handleVerificationSuccess(bool isExistingUser) {
+    if (isExistingUser) {
+      // 🟢 EXISTING USER -> DIRECT DASHBOARD
+      // Navigator.pushAndRemoveUntil(
+      //   context,
+      //   MaterialPageRoute(builder: (_) => const MemberHomeScreen()),
+      //   (route) => false, // Remove all previous routes
+      // );
+      debugPrint("Navigate to Member Dashboard"); // Placeholder
+    } else {
+      // 🟠 NEW USER -> REGISTRATION STEP 1
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authController = Provider.of<AuthController>(context);
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // 📏 Measurements
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final double topBarrierHeight =
         MediaQuery.of(context).padding.top + kToolbarHeight - 50;
 
-    // Smaller pin theme for more compact look
     final defaultPinTheme = PinTheme(
       width: 48,
       height: 52,
@@ -71,16 +93,12 @@ class _OtpScreenState extends State<OtpScreen> {
 
       body: Stack(
         children: [
-          // ============================================
-          // LAYER 1: BACKGROUND (Gradient + Flag)
-          // ============================================
           Positioned.fill(
             child: GradientBackground(
               child: Stack(
                 fit: StackFit.expand,
                 children: [
                   Positioned(
-                    // Aligned loosely with the top barrier
                     top: topBarrierHeight + 65,
                     bottom: 0,
                     left: -42,
@@ -99,15 +117,10 @@ class _OtpScreenState extends State<OtpScreen> {
             ),
           ),
 
-          // ============================================
-          // LAYER 2: MANUAL LAYOUT COLUMN
-          // ============================================
           Column(
             children: [
-              // 🧱 TOP BARRIER
               SizedBox(height: topBarrierHeight),
 
-              // 🎯 CONTENT AREA
               Expanded(
                 child: Center(
                   child: SingleChildScrollView(
@@ -119,10 +132,8 @@ class _OtpScreenState extends State<OtpScreen> {
                         horizontal: 22,
                       ),
                       decoration: BoxDecoration(
-                        // ✅ MATCH LOGIN SCREEN: Transparent White
                         color: AppColors.white.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(24),
-                        // ✅ MATCH LOGIN SCREEN: Border
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.4),
                           width: 1.5,
@@ -138,7 +149,6 @@ class _OtpScreenState extends State<OtpScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Smaller icon container
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
@@ -152,7 +162,6 @@ class _OtpScreenState extends State<OtpScreen> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          // Smaller title
                           Text(
                             "VERIFICATION",
                             style: GoogleFonts.anekDevanagari(
@@ -163,7 +172,6 @@ class _OtpScreenState extends State<OtpScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          // Smaller text
                           RichText(
                             textAlign: TextAlign.center,
                             text: TextSpan(
@@ -188,7 +196,8 @@ class _OtpScreenState extends State<OtpScreen> {
                           ),
 
                           const SizedBox(height: 24),
-                          // Pinput
+
+                          // ✅ UPDATED PINPUT LOGIC
                           Pinput(
                             length: 6,
                             controller: _otpController,
@@ -199,7 +208,11 @@ class _OtpScreenState extends State<OtpScreen> {
                             pinputAutovalidateMode:
                                 PinputAutovalidateMode.onSubmit,
                             onCompleted: (pin) {
-                              authController.verifyOtp(pin, () {});
+                              // 🚀 Pass the handler to the controller
+                              authController.verifyOtp(
+                                pin,
+                                _handleVerificationSuccess,
+                              );
                             },
                           ),
 
@@ -217,7 +230,8 @@ class _OtpScreenState extends State<OtpScreen> {
                             ),
 
                           const SizedBox(height: 24),
-                          // Smaller button
+
+                          // ✅ UPDATED BUTTON LOGIC
                           SizedBox(
                             width: double.infinity,
                             height: 48,
@@ -227,7 +241,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                   : () {
                                       authController.verifyOtp(
                                         _otpController.text.trim(),
-                                        () {},
+                                        _handleVerificationSuccess,
                                       );
                                     },
                               style: ElevatedButton.styleFrom(
@@ -261,7 +275,9 @@ class _OtpScreenState extends State<OtpScreen> {
                           const SizedBox(height: 16),
 
                           GestureDetector(
-                            onTap: () {},
+                            onTap: () {
+                              // Resend logic
+                            },
                             child: Text(
                               "Didn't receive code? Resend",
                               style: GoogleFonts.anekDevanagari(
@@ -279,7 +295,6 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
 
-              // 🎹 KEYBOARD PUSHER
               SizedBox(height: keyboardHeight * 0.55),
             ],
           ),

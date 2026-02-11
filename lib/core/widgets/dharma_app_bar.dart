@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../constants/colors.dart'; // ✅ Using your AppColors
+import '../constants/colors.dart';
 import '/core/enums/app_bar_type.dart';
 
 class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
   final DharmaAppBarType type;
   final VoidCallback? onPrimaryAction;
   final Widget? customAction;
+  final String? title; // ✅ Added missing parameter
 
   const DharmaAppBar({
     super.key,
     required this.type,
     this.onPrimaryAction,
     this.customAction,
+    this.title, // ✅ Added to constructor
   });
 
   @override
@@ -22,7 +24,6 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
         type == DharmaAppBarType.login || type == DharmaAppBarType.custom;
 
     return AppBar(
-      // ✅ Use AppColors.white (with your specific opacity if needed)
       backgroundColor: AppColors.white.withValues(alpha: 0.98),
       elevation: 4,
       shadowColor: Colors.black.withValues(alpha: 5),
@@ -34,7 +35,7 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
           ? Container(
               margin: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary, // ✅ Swapped to AppColors.primary
+                color: AppColors.primary,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: IconButton(
@@ -49,57 +50,69 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
             )
           : null,
 
-      titleSpacing: showBackButton ? 0 : 15,
+      // If title is present, center it. If not (logo), use your spacing logic.
+      titleSpacing: (title != null) ? 0 : (showBackButton ? 0 : 15),
+      centerTitle: title != null,
 
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(5)),
       ),
 
-      title: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Transform.translate(
-            offset: const Offset(0, 6),
-            child: Stack(
+      // ✅ LOGIC UPDATE:
+      // If 'title' is passed (Registration), show text.
+      // Else, show your EXACT original UI ("धर्म योद्धा").
+      title: title != null
+          ? Text(
+              title!,
+              style: GoogleFonts.anekDevanagari(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 1. OUTLINE LAYER (Stroke)
-                Text(
-                  "धर्म योद्धा",
-                  // ✅ EXACT SAME STYLE, just swapped color to AppColors
-                  style: GoogleFonts.anekDevanagari(
-                    fontSize: 35, // 🔒 KEEPS YOUR SIZE
-                    fontWeight: FontWeight.w700, // 🔒 KEEPS YOUR WEIGHT
-                    height: 1,
-                    foreground: Paint()
-                      ..style = PaintingStyle.stroke
-                      ..strokeWidth = 1
-                      ..color = AppColors.white, // ✅ Swapped to AppColors
-                    shadows: const [
-                      Shadow(
-                        offset: Offset(0, 1.2),
-                        blurRadius: 4,
-                        color: Colors.black26,
+                Transform.translate(
+                  offset: const Offset(0, 6),
+                  child: Stack(
+                    children: [
+                      // 1. OUTLINE LAYER (Stroke)
+                      Text(
+                        "धर्म योद्धा",
+                        style: GoogleFonts.anekDevanagari(
+                          fontSize: 35,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                          foreground: Paint()
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = 1
+                            ..color = AppColors.white,
+                          shadows: const [
+                            Shadow(
+                              offset: Offset(0, 1.2),
+                              blurRadius: 4,
+                              color: Colors.black26,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 2. FILL LAYER (Solid Color)
+                      Text(
+                        "धर्म योद्धा",
+                        style: GoogleFonts.anekDevanagari(
+                          fontSize: 35,
+                          fontWeight: FontWeight.w700,
+                          height: 1,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                // 2. FILL LAYER (Solid Color)
-                Text(
-                  "धर्म योद्धा",
-                  // ✅ EXACT SAME STYLE
-                  style: GoogleFonts.anekDevanagari(
-                    fontSize: 35, // 🔒 KEEPS YOUR SIZE
-                    fontWeight: FontWeight.w700, // 🔒 KEEPS YOUR WEIGHT
-                    height: 1,
-                    color: AppColors.primary, // ✅ Swapped to AppColors.primary
-                  ),
-                ),
               ],
             ),
-          ),
-        ],
-      ),
 
       actions: [
         Padding(
@@ -122,7 +135,7 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: Text(
               "Admin Login",
               style: GoogleFonts.anekDevanagari(
-                color: AppColors.textSecondary, // ✅ Swapped to AppColors
+                color: AppColors.textSecondary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 decoration: TextDecoration.underline,
@@ -149,7 +162,7 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
     return ElevatedButton(
       onPressed: onPrimaryAction,
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary, // ✅ Swapped to AppColors
+        backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
         elevation: 2,
         minimumSize: const Size(0, 37),
