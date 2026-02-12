@@ -5,7 +5,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/widgets/gradient_background.dart';
 import '../../../core/widgets/dharma_app_bar.dart';
 import '../../../core/enums/app_bar_type.dart';
-import 'package:member_management_app/features/member/screens/member_login_page.dart'; // Adjust path as needed
+import 'package:member_management_app/features/member/screens/member_login_screen.dart'; // Adjust path as needed
 
 class PublicHomePage extends StatelessWidget {
   const PublicHomePage({super.key});

@@ -7,19 +7,18 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
   final DharmaAppBarType type;
   final VoidCallback? onPrimaryAction;
   final Widget? customAction;
-  final String? title; // ✅ Added missing parameter
+  final String? title;
 
   const DharmaAppBar({
     super.key,
     required this.type,
     this.onPrimaryAction,
     this.customAction,
-    this.title, // ✅ Added to constructor
+    this.title,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Logic for back button
     final bool showBackButton =
         type == DharmaAppBarType.login || type == DharmaAppBarType.custom;
 
@@ -28,8 +27,9 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 4,
       shadowColor: Colors.black.withValues(alpha: 5),
       toolbarHeight: 70,
-
       automaticallyImplyLeading: false,
+
+      // ✅ 1. FIXED BACK BUTTON LOGIC
       leadingWidth: showBackButton ? 60 : 0,
       leading: showBackButton
           ? Container(
@@ -45,22 +45,24 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
                   color: AppColors.white,
                   size: 22,
                 ),
-                onPressed: () => Navigator.pop(context),
+                // 👇 THIS IS THE KEY FIX 👇
+                onPressed: () {
+                  if (onPrimaryAction != null) {
+                    onPrimaryAction!();
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
               ),
             )
           : null,
 
-      // If title is present, center it. If not (logo), use your spacing logic.
       titleSpacing: (title != null) ? 0 : (showBackButton ? 0 : 15),
       centerTitle: title != null,
-
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(5)),
       ),
 
-      // ✅ LOGIC UPDATE:
-      // If 'title' is passed (Registration), show text.
-      // Else, show your EXACT original UI ("धर्म योद्धा").
       title: title != null
           ? Text(
               title!,
@@ -77,7 +79,6 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
                   offset: const Offset(0, 6),
                   child: Stack(
                     children: [
-                      // 1. OUTLINE LAYER (Stroke)
                       Text(
                         "धर्म योद्धा",
                         style: GoogleFonts.anekDevanagari(
@@ -97,8 +98,6 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
                           ],
                         ),
                       ),
-
-                      // 2. FILL LAYER (Solid Color)
                       Text(
                         "धर्म योद्धा",
                         style: GoogleFonts.anekDevanagari(
