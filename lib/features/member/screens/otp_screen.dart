@@ -8,10 +8,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/widgets/dharma_app_bar.dart';
 import '../../../core/enums/app_bar_type.dart';
 import '../../../core/widgets/gradient_background.dart';
-
-// ✅ Import the destination screens
-import '../../member/screens/new_member_registration/personal_info_screen.dart';
-// import '../../member/screens/member_home_screen.dart'; // Uncomment when created
+// import 'package:member_management_app/routes/app_routes.dart'; // Ensure this exists
 
 class OtpScreen extends StatefulWidget {
   final String mobileNumber;
@@ -24,35 +21,30 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final TextEditingController _otpController = TextEditingController();
 
-  // ✅ Helper method to handle navigation based on registration status
-  void _handleVerificationSuccess(bool isExistingUser) {
-    if (isExistingUser) {
-      // 🟢 EXISTING USER -> DIRECT DASHBOARD
-      // Navigator.pushAndRemoveUntil(
-      //   context,
-      //   MaterialPageRoute(builder: (_) => const MemberHomeScreen()),
-      //   (route) => false, // Remove all previous routes
-      // );
-      debugPrint("Navigate to Member Dashboard"); // Placeholder
-    } else {
-      // 🟠 NEW USER -> REGISTRATION STEP 1
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
-        (route) => false,
-      );
-    }
+  // ✅ UPDATED: Now accepts a Route Name (String) instead of bool
+  // The Controller decides the destination, the UI just executes it.
+  void _handleNavigation(String routeName) {
+    debugPrint("🚀 Navigating to: $routeName");
+
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      routeName,
+      (route) => false, // Clear history so they can't go back to Login
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // 1. Listen to AuthController
     final authController = Provider.of<AuthController>(context);
     final screenWidth = MediaQuery.of(context).size.width;
 
+    // 2. Keyboard & Layout Calculations
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final double topBarrierHeight =
         MediaQuery.of(context).padding.top + kToolbarHeight - 50;
 
+    // 3. Pin Theme Styling
     final defaultPinTheme = PinTheme(
       width: 48,
       height: 52,
@@ -67,7 +59,7 @@ class _OtpScreenState extends State<OtpScreen> {
         border: Border.all(color: Colors.black12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             offset: const Offset(0, 3),
             blurRadius: 5,
           ),
@@ -93,6 +85,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
       body: Stack(
         children: [
+          // A. Background Gradient & Flag
           Positioned.fill(
             child: GradientBackground(
               child: Stack(
@@ -117,6 +110,7 @@ class _OtpScreenState extends State<OtpScreen> {
             ),
           ),
 
+          // B. Main Content
           Column(
             children: [
               SizedBox(height: topBarrierHeight),
@@ -132,15 +126,15 @@ class _OtpScreenState extends State<OtpScreen> {
                         horizontal: 22,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.white.withValues(alpha: 0.85),
+                        color: Colors.white.withOpacity(0.85),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: Colors.white.withOpacity(0.4),
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
+                            color: Colors.black.withOpacity(0.08),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -149,19 +143,22 @@ class _OtpScreenState extends State<OtpScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Icon
                           Container(
                             padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: AppColors.primaryLight,
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.lock_outline,
                               color: AppColors.primary,
                               size: 28,
                             ),
                           ),
                           const SizedBox(height: 18),
+
+                          // Title
                           Text(
                             "VERIFICATION",
                             style: GoogleFonts.anekDevanagari(
@@ -172,6 +169,8 @@ class _OtpScreenState extends State<OtpScreen> {
                             ),
                           ),
                           const SizedBox(height: 6),
+
+                          // Subtitle with Number
                           RichText(
                             textAlign: TextAlign.center,
                             text: TextSpan(
@@ -186,7 +185,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                 ),
                                 TextSpan(
                                   text: widget.mobileNumber,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: AppColors.textPrimary,
                                   ),
@@ -197,7 +196,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
                           const SizedBox(height: 24),
 
-                          // ✅ UPDATED PINPUT LOGIC
+                          // 🔢 PIN INPUT (PINPUT)
                           Pinput(
                             length: 6,
                             controller: _otpController,
@@ -207,15 +206,14 @@ class _OtpScreenState extends State<OtpScreen> {
                             showCursor: true,
                             pinputAutovalidateMode:
                                 PinputAutovalidateMode.onSubmit,
+
+                            // 🚀 Trigger Verify on Completion
                             onCompleted: (pin) {
-                              // 🚀 Pass the handler to the controller
-                              authController.verifyOtp(
-                                pin,
-                                _handleVerificationSuccess,
-                              );
+                              authController.verifyOtp(pin, _handleNavigation);
                             },
                           ),
 
+                          // ⚠️ Error Message
                           if (authController.errorMessage != null)
                             Padding(
                               padding: const EdgeInsets.only(top: 12),
@@ -231,7 +229,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
                           const SizedBox(height: 24),
 
-                          // ✅ UPDATED BUTTON LOGIC
+                          // ✅ VERIFY BUTTON
                           SizedBox(
                             width: double.infinity,
                             height: 48,
@@ -241,7 +239,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                   : () {
                                       authController.verifyOtp(
                                         _otpController.text.trim(),
-                                        _handleVerificationSuccess,
+                                        _handleNavigation,
                                       );
                                     },
                               style: ElevatedButton.styleFrom(
@@ -274,9 +272,10 @@ class _OtpScreenState extends State<OtpScreen> {
 
                           const SizedBox(height: 16),
 
+                          // Resend Link
                           GestureDetector(
                             onTap: () {
-                              // Resend logic
+                              // Call resend logic here
                             },
                             child: Text(
                               "Didn't receive code? Resend",
@@ -295,6 +294,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
 
+              // Keyboard Spacer
               SizedBox(height: keyboardHeight * 0.55),
             ],
           ),

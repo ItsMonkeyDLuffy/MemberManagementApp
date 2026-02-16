@@ -1,8 +1,14 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart'; // ✅ Added for Repo access
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Added for UID
 
 import '../../../../core/constants/colors.dart';
+
+// ✅ Routes & Repo
+import 'package:member_management_app/routes/app_routes.dart';
+import '../../../../data/repositories/interfaces/member_repository.dart';
 
 // ✅ Shared Widgets
 import 'widgets_registration/registration_wrapper.dart';
@@ -10,7 +16,7 @@ import 'widgets_registration/registration_card.dart';
 import 'widgets_registration/form_components.dart';
 
 // ✅ Logic
-import 'registration_data_manager.dart';
+import '../registration_data_manager.dart';
 
 class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
@@ -22,20 +28,64 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   final _data = RegistrationDataManager(); // ✅ Singleton Instance
   bool _isInfoConfirmed = false;
+  bool _isProcessing = false; // ✅ Loading State
 
-  void _handlePayment() {
-    // 🚀 FINAL SUBMISSION LOGIC
-    // Access all data via _data manager:
-    // Personal: _data.name, _data.aadharNumber, etc.
-    // Bank: _data.accountNo, _data.ifsc, etc.
-    // Beneficiaries: _data.beneficiaries (List)
+  Future<void> _handlePayment() async {
+    setState(() => _isProcessing = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Initiating Payment Gateway..."),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+    try {
+      // 1. SIMULATE PAYMENT GATEWAY
+      // In a real app, you would await Razorpay/Stripe here.
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!mounted) return;
+
+      // 2. UPDATE FIRESTORE STATUS
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+
+      // We update status to 'PENDING_APPROVAL' (or 'ACTIVE' depending on your logic)
+      // We also mark payment as done.
+      await context.read<MemberRepository>().updateProfile(
+        uid: uid,
+        data: {
+          'status': 'PENDING_APPROVAL', // Registration Complete!
+          'payment_status': 'COMPLETED',
+          'amount_paid': 499.00,
+          'current_step': 5, // 5 = Done
+          'submitted_at': DateTime.now(),
+        },
+      );
+
+      // 3. CLEAR LOCAL DATA
+      _data.clearData();
+
+      // 4. NAVIGATE TO DASHBOARD
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Payment Successful! Welcome Aboard."),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Clear stack and go to Home
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          AppRoutes.memberHome, // Ensure this route exists in your AppRoutes
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Payment Failed: $e"),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   void _openTermsAndConditions() {
@@ -88,7 +138,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: AppColors.primary.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -205,7 +255,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: _isInfoConfirmed ? _handlePayment : null,
+                  onPressed: (_isInfoConfirmed && !_isProcessing)
+                      ? _handlePayment
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isInfoConfirmed
                         ? AppColors.primary
@@ -216,15 +268,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                     elevation: _isInfoConfirmed ? 2 : 0,
                   ),
-                  child: Text(
-                    "PAY NOW",
-                    style: GoogleFonts.roboto(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
+                  child: _isProcessing
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          "PAY NOW",
+                          style: GoogleFonts.roboto(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
                 ),
               ),
 

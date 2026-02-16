@@ -4,7 +4,7 @@ import 'dart:async';
 
 // ✅ Core Imports
 import '../../../core/constants/colors.dart';
-import 'public_home_page.dart'; // Ensure path is correct
+import 'package:member_management_app/routes/app_routes.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,10 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
     // ⏳ Wait 3 seconds, then Navigate
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PublicHomePage()),
-        );
+        Navigator.pushReplacementNamed(context, AppRoutes.publicHome);
       }
     });
   }

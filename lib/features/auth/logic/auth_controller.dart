@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../data/repositories/interfaces/auth_repository.dart';
 import '../../../data/repositories/interfaces/member_repository.dart';
+import '../../../data/models/user_model.dart';
+import '../../member/new_member_registration/registration_data_manager.dart'; // import '../../../routes/app_routes.dart'; // ✅ Added for Route Constants
+import 'package:member_management_app/routes/app_routes.dart';
 
 class AuthController extends ChangeNotifier {
   final AuthRepository _authRepository;
@@ -8,9 +11,9 @@ class AuthController extends ChangeNotifier {
 
   AuthController({
     required AuthRepository authRepository,
-    required MemberRepository memberRepository, // <--- Add this argument
+    required MemberRepository memberRepository,
   }) : _authRepository = authRepository,
-       _memberRepository = memberRepository; // <--- Correct assignment
+       _memberRepository = memberRepository;
 
   bool _isLoading = false;
   String? _verificationId;
@@ -19,7 +22,9 @@ class AuthController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  // Step 1: UI calls this to send OTP
+  // ==========================================
+  // 1️⃣ SEND OTP
+  // ==========================================
   Future<void> loginWithPhone(String phone, VoidCallback onSuccess) async {
     _isLoading = true;
     _errorMessage = null;
@@ -32,7 +37,7 @@ class AuthController extends ChangeNotifier {
           _verificationId = verId;
           _isLoading = false;
           notifyListeners();
-          onSuccess(); // Navigate to OTP Screen
+          onSuccess();
         },
         onError: (msg) {
           _errorMessage = msg;
@@ -47,11 +52,12 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // ✅ Step 2: UI calls this to verify
-  // CHANGED: onSuccess now accepts a bool (isExistingUser)
+  // ==========================================
+  // 2️⃣ VERIFY OTP & ROUTE USER
+  // ==========================================
   Future<void> verifyOtp(
     String otp,
-    Function(bool isExisting) onSuccess,
+    Function(String routeName) onNavigate,
   ) async {
     if (_verificationId == null) return;
 
@@ -59,39 +65,71 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. Verify with Firebase Auth
-      final user = await _authRepository.verifyOtp(
+      final firebaseUser = await _authRepository.verifyOtp(
         verificationId: _verificationId!,
         smsCode: otp,
       );
 
-      if (user != null) {
-        // 2. Check if user exists in our Database (Firestore)
-        bool exists = await _memberRepository.checkUserExists(user.uid);
+      if (firebaseUser != null) {
+        UserModel? existingUser = await _memberRepository.getUserDetails(
+          firebaseUser.uid,
+        );
 
-        if (!exists) {
-          // 3. New User? Create a profile entry
-          await _memberRepository.createInitialUser(
-            uid: user.uid,
-            mobileNo: user.mobileNo,
+        if (existingUser != null) {
+          // --- SCENARIO 1: EXISTING USER ---
+          if (existingUser.status == 'ACTIVE' ||
+              existingUser.status == 'PENDING_APPROVAL') {
+            RegistrationDataManager().clearData();
+            _isLoading = false;
+            notifyListeners();
+            // ✅ Use AppRoutes constant
+            onNavigate(AppRoutes.memberHome);
+          } else {
+            // ⚠️ INCOMPLETE APPLICATION -> RESUME DRAFT
+            RegistrationDataManager().loadFromModel(existingUser);
+
+            _isLoading = false;
+            notifyListeners();
+
+            // ✅ Map currentStep to AppRoutes constants
+            int step = existingUser.currentStep;
+            if (step == 2) {
+              onNavigate(AppRoutes.registrationStep2);
+            } else if (step == 3) {
+              onNavigate(AppRoutes.registrationStep3);
+            } else if (step == 4) {
+              onNavigate(AppRoutes.registrationStep4);
+            } else {
+              onNavigate(AppRoutes.registrationStep1);
+            }
+          }
+        } else {
+          // --- SCENARIO 2: NEW USER ---
+          final newUser = UserModel(
+            uid: firebaseUser.uid,
+            mobileNo: firebaseUser.mobileNo,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            status: 'INCOMPLETE',
+            currentStep: 1,
           );
+
+          await _memberRepository.createInitialUser(newUser);
+
+          RegistrationDataManager().clearData();
+          _isLoading = false;
+          notifyListeners();
+          // ✅ Use AppRoutes constant
+          onNavigate(AppRoutes.registrationStep1);
         }
-
-        _isLoading = false;
-        notifyListeners();
-
-        // ✅ CALL CALLBACK WITH RESULT
-        // True = Existing User -> Dashboard
-        // False = New User -> Registration Step 1
-        onSuccess(exists);
       } else {
-        _errorMessage = "Login Failed";
+        _errorMessage = "Verification failed. Try again.";
         _isLoading = false;
         notifyListeners();
       }
     } catch (e) {
       _isLoading = false;
-      _errorMessage = e.toString();
+      _errorMessage = "Error: $e";
       notifyListeners();
     }
   }

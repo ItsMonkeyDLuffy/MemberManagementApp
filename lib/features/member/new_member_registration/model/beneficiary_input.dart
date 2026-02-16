@@ -1,16 +1,17 @@
 import 'dart:io';
 
-// ⚠️ Renamed from BeneficiaryModel to BeneficiaryInput
 class BeneficiaryInput {
+  final String id; // ✅ Added ID (Needed for deleting items from list)
   final String name;
   final String relation;
   final String dob;
-  final String gender; // UI has gender, Data model might need it added later
+  final String gender;
   final String aadhar;
-  final File? frontPhoto; // Only needed in UI for upload
-  final File? backPhoto; // Only needed in UI for upload
+  final File? frontPhoto;
+  final File? backPhoto;
 
   BeneficiaryInput({
+    required this.id, // ✅ Required
     required this.name,
     required this.relation,
     required this.dob,

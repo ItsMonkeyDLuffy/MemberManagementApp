@@ -28,7 +28,7 @@ class DocumentThumbnail extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: hasImage
-                ? Colors.green.withOpacity(0.5)
+                ? Colors.green.withValues(alpha: 0.5)
                 : Colors.grey.shade300,
           ),
         ),
@@ -71,7 +71,7 @@ class DocumentThumbnail extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
+                        color: Colors.black.withValues(alpha: 0.6),
                         borderRadius: const BorderRadius.vertical(
                           bottom: Radius.circular(8),
                         ),

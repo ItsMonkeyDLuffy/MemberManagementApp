@@ -5,11 +5,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 // ✅ Logic & Core
 import '../../auth/logic/auth_controller.dart';
-import '../../member/screens/otp_screen.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/dharma_app_bar.dart';
 import '../../../core/enums/app_bar_type.dart';
 import '../../../core/widgets/gradient_background.dart';
+import 'package:member_management_app/routes/app_routes.dart';
 
 // 👇 IMPORT YOUR PUBLIC HOME SCREEN HERE
 import 'package:member_management_app/features/shared/screens/public_home_page.dart';
@@ -242,8 +242,9 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                       keyboardType: TextInputType.phone,
                                       maxLength: 10,
                                       onChanged: (val) {
-                                        if (!_isPhoneValid)
+                                        if (!_isPhoneValid) {
                                           setState(() => _isPhoneValid = true);
+                                        }
                                       },
                                       style: GoogleFonts.anekDevanagari(
                                         fontSize: 18,
@@ -329,14 +330,15 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                           setState(() => _isPhoneValid = true);
                                           authController.loginWithPhone(
                                             "+91$phone",
-                                            () => Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => OtpScreen(
-                                                  mobileNumber: "+91$phone",
-                                                ),
-                                              ),
-                                            ),
+                                            () {
+                                              // ✅ USE NAMED ROUTE
+                                              Navigator.pushNamed(
+                                                context,
+                                                AppRoutes.otp,
+                                                arguments:
+                                                    "+91$phone", // ✅ Passed to onGenerateRoute
+                                              );
+                                            },
                                           );
                                         } else {
                                           setState(() => _isPhoneValid = false);

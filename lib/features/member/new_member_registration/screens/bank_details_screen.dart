@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart'; // ✅ Added for Repo
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Added for UID
+
+// ✅ Import Routes & Repo
+import 'package:member_management_app/routes/app_routes.dart';
+import '../../../../data/repositories/interfaces/member_repository.dart'; // ✅ Added Repo Interface
 
 import '../../../../core/constants/colors.dart';
 
@@ -9,8 +15,7 @@ import 'widgets_registration/registration_card.dart';
 import 'widgets_registration/form_components.dart';
 
 // ✅ Logic
-import 'registration_data_manager.dart';
-import 'package:member_management_app/features/member/screens/new_member_registration/benificiary_screen.dart';
+import '../registration_data_manager.dart';
 
 class BankDetailsScreen extends StatefulWidget {
   const BankDetailsScreen({super.key});
@@ -28,19 +33,26 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
   late TextEditingController _ifscCtrl;
   late TextEditingController _bankNameCtrl;
 
+  bool _isSaving = false; // ✅ Loader State
+
   @override
   void initState() {
     super.initState();
-    // 🔄 LOAD SAVED DATA
+    // 🔄 AUTO-FILL: Load Saved Data (from Singleton)
     _acNoCtrl = TextEditingController(text: _data.accountNo);
-    _confAcNoCtrl = TextEditingController(text: _data.confirmAccountNo);
+    // If confirm is empty but account isn't, pre-fill confirm too for convenience
+    _confAcNoCtrl = TextEditingController(
+      text: _data.confirmAccountNo.isNotEmpty
+          ? _data.confirmAccountNo
+          : _data.accountNo,
+    );
     _ifscCtrl = TextEditingController(text: _data.ifsc);
     _bankNameCtrl = TextEditingController(text: _data.bankName);
   }
 
   @override
   void dispose() {
-    // 💾 SAVE DATA
+    // Sync back to singleton on exit
     _data.accountNo = _acNoCtrl.text;
     _data.confirmAccountNo = _confAcNoCtrl.text;
     _data.ifsc = _ifscCtrl.text;
@@ -53,6 +65,55 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     super.dispose();
   }
 
+  // ==========================================
+  // 💾 LOGIC: SAVE DRAFT & NEXT
+  // ==========================================
+  Future<void> _onNextPressed() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+
+      // 1. Sync to Singleton
+      _data.accountNo = _acNoCtrl.text.trim();
+      _data.confirmAccountNo = _confAcNoCtrl.text.trim();
+      _data.ifsc = _ifscCtrl.text.trim().toUpperCase();
+      _data.bankName = _bankNameCtrl.text.trim();
+
+      // 2. Prepare Payload
+      final draftData = {
+        'current_step': 3, // Move to Beneficiary Step next time
+        'bank_details': {
+          'account_no': _data.accountNo,
+          'ifsc': _data.ifsc,
+          'bank_name': _data.bankName,
+          // 'branch_name': ... (Add this if you have a controller for it)
+        },
+      };
+
+      // 3. Save to Firestore
+      await context.read<MemberRepository>().saveMemberDraft(
+        uid: uid,
+        data: draftData,
+      );
+
+      // 4. Navigate
+      if (mounted) {
+        setState(() => _isSaving = false);
+        Navigator.pushNamed(context, AppRoutes.registrationStep3);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error saving draft: $e")));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
@@ -61,7 +122,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
         : 20.0;
 
     return RegistrationWrapper(
-      // Standard Back Navigation (Goes back to Step 1)
       onBack: () => Navigator.pop(context),
 
       child: RegistrationCard(
@@ -112,6 +172,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         controller: _acNoCtrl,
                         hint: "Enter Account Number",
                         keyboardType: TextInputType.number,
+                        validator: (val) =>
+                            (val == null || val.isEmpty) ? "Required" : null,
                       ),
                       const SizedBox(height: 16),
 
@@ -123,9 +185,13 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         keyboardType: TextInputType.number,
                         validator: (val) {
                           if (val == null || val.isEmpty) return "Required";
-                          if (val != _acNoCtrl.text)
+
+                          if (val != _acNoCtrl.text) {
                             return "Account numbers do not match";
-                          return null;
+                            // ❌ Deleted 'return null;' from here (it was dead code)
+                          }
+
+                          return null; // ✅ Added this at the end (Success case)
                         },
                       ),
                       const SizedBox(height: 16),
@@ -136,6 +202,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         controller: _ifscCtrl,
                         hint: "Enter IFSC Code",
                         textCapitalization: TextCapitalization.characters,
+                        validator: (val) =>
+                            (val == null || val.isEmpty) ? "Required" : null,
                       ),
                       const SizedBox(height: 16),
 
@@ -145,25 +213,18 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         controller: _bankNameCtrl,
                         hint: "Enter Bank Name",
                         textCapitalization: TextCapitalization.words,
+                        validator: (val) =>
+                            (val == null || val.isEmpty) ? "Required" : null,
                       ),
 
                       const SizedBox(height: 30),
 
-                      // NEXT BUTTON
+                      // ✅ NEXT BUTTON (Updated Logic)
                       SizedBox(
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: () {
-                            if (_formKey.currentState!.validate()) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const BeneficiaryScreen(),
-                                ),
-                              );
-                            }
-                          },
+                          onPressed: _isSaving ? null : _onNextPressed,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             shape: RoundedRectangleBorder(
@@ -171,15 +232,24 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                             ),
                             elevation: 2,
                           ),
-                          child: Text(
-                            "NEXT: BENEFICIARY",
-                            style: GoogleFonts.roboto(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  "NEXT: BENEFICIARY",
+                                  style: GoogleFonts.roboto(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                         ),
                       ),
                     ],

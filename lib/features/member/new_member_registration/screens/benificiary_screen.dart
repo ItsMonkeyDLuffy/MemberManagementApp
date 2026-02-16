@@ -3,6 +3,12 @@ import 'dart:ui' as ui; // For DashedBorderPainter
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+// ✅ Import Routes & Repo
+import 'package:member_management_app/routes/app_routes.dart';
+import '../../../../data/repositories/interfaces/member_repository.dart';
 
 import '../../../../core/constants/colors.dart';
 
@@ -13,12 +19,10 @@ import 'widgets_registration/form_components.dart';
 import 'widgets_registration/document_thumbnail.dart';
 import 'widgets_registration/image_picker_utils.dart';
 
-// ✅ Logic & Screens
-import 'registration_data_manager.dart';
-import 'payment_screen.dart';
-
+// ✅ Logic
+import '../registration_data_manager.dart';
 // ✅ Model Import
-import 'model/beneficiary_input.dart';
+import '../model/beneficiary_input.dart';
 
 class BeneficiaryScreen extends StatefulWidget {
   const BeneficiaryScreen({super.key});
@@ -32,6 +36,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   final _data = RegistrationDataManager(); // ✅ Singleton
 
   bool _isAddingNew = false;
+  bool _isSaving = false; // To show loader on "Next"
   int? _editingIndex;
 
   // Controllers
@@ -39,6 +44,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _aadharController = TextEditingController();
 
+  // Dummy focus nodes
   final FocusNode _aadharFocusNode = FocusNode();
   final FocusNode _dummyFocusNode = FocusNode();
 
@@ -70,7 +76,100 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   }
 
   // ==========================================
-  // ⚙️ LOGIC
+  // 🛑 UNIFIED EXIT LOGIC (Added for Safety)
+  // ==========================================
+  Future<void> _handleExit() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        elevation: 10,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.primary,
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text(
+              "Exit Registration?",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.anekDevanagari(
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          "Your unsaved progress will be lost. Are you sure?",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.roboto(
+            fontSize: 15,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: Text(
+                    "Yes, Exit",
+                    style: GoogleFonts.roboto(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
+                  child: Text(
+                    "No, Stay",
+                    style: GoogleFonts.roboto(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (shouldExit == true) {
+      if (!mounted) return;
+      _data.clearData();
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.login,
+        (route) => false,
+      );
+    }
+  }
+
+  // ==========================================
+  // ⚙️ LOGIC: FORM HANDLING
   // ==========================================
 
   void _resetForm() {
@@ -99,26 +198,27 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       _currentBackPhoto = person.backPhoto;
 
       _editingIndex = index;
-      _isAddingNew = true;
+      _isAddingNew = true; // Open the form
     });
   }
 
-  void _saveBeneficiary() {
+  void _saveBeneficiaryToList() {
     FocusScope.of(context).unfocus();
 
     if (_formKey.currentState!.validate()) {
-      if (_aadharController.text.isNotEmpty &&
-          (_currentFrontPhoto == null || _currentBackPhoto == null)) {
+      if (_selectedRelation == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Please upload BOTH Aadhar photos"),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text("Please select a relationship")),
         );
         return;
       }
 
+      // Create the Object
       final newPerson = BeneficiaryInput(
+        // If editing, keep ID. If new, generate ID.
+        id: _editingIndex != null
+            ? _data.beneficiaries[_editingIndex!].id
+            : DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text,
         relation: _selectedRelation!,
         dob: _dobController.text,
@@ -135,7 +235,8 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
           _data.beneficiaries.add(newPerson);
         }
       });
-      _resetForm();
+
+      _resetForm(); // Close form and go back to list
     }
   }
 
@@ -146,11 +247,61 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
     });
   }
 
+  // ==========================================
+  // 💾 LOGIC: CLOUD SAVE (AUTO-SAVE)
+  // ==========================================
+  Future<void> _onNextPressed() async {
+    setState(() => _isSaving = true);
+
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+
+      // 1. Convert UI List to Firestore List (Map)
+      // Note: We only save text data to Firestore draft.
+      final nomineesList = _data.beneficiaries
+          .map(
+            (b) => {
+              'name': b.name,
+              'relation': b.relation,
+              'dob': b.dob,
+              'aadhaar': b.aadhar,
+              'gender': b.gender,
+            },
+          )
+          .toList();
+
+      // 2. Prepare Data Payload
+      final draftData = {
+        'current_step': 4, // Next time they login, they go to Payment (Step 4)
+        'nominees': nomineesList,
+      };
+
+      // 3. Save to Firestore
+      await context.read<MemberRepository>().saveMemberDraft(
+        uid: uid,
+        data: draftData,
+      );
+
+      // 4. Navigate
+      if (mounted) {
+        setState(() => _isSaving = false);
+        Navigator.pushNamed(context, AppRoutes.registrationStep4);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error saving draft: $e")));
+      }
+    }
+  }
+
   Future<void> _selectDate(BuildContext context) async {
     FocusScope.of(context).requestFocus(_dummyFocusNode);
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(2010),
+      initialDate: DateTime(2000),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
       builder: (context, child) => Theme(
@@ -177,67 +328,59 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         ? keyboardHeight - 70
         : 10.0;
 
-    return RegistrationWrapper(
-      onBack: () => Navigator.pop(context),
-
-      child: RegistrationCard(
-        child: Column(
-          // ✅ 1. Outer Column needs to start at top
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            // --- HEADER ---
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 25, 20, 10),
-              child: Column(
-                children: [
-                  Text(
-                    "MEMBER REGISTRATION",
-                    style: GoogleFonts.anekDevanagari(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleExit();
+      },
+      child: RegistrationWrapper(
+        onBack: _handleExit, // ✅ Calls safety check
+        child: RegistrationCard(
+          child: Column(
+            children: [
+              // --- HEADER ---
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 25, 20, 10),
+                child: Column(
+                  children: [
+                    Text(
+                      "MEMBER REGISTRATION",
+                      style: GoogleFonts.anekDevanagari(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Step 3 of 4: Beneficiaries (${_data.beneficiaries.length}/5)",
-                    style: GoogleFonts.anekDevanagari(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
+                    const SizedBox(height: 8),
+                    Text(
+                      "Step 3 of 4: Beneficiaries (${_data.beneficiaries.length}/5)",
+                      style: GoogleFonts.anekDevanagari(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const ProgressPills(totalSteps: 4, currentStep: 3),
-                ],
+                    const SizedBox(height: 20),
+                    const ProgressPills(totalSteps: 4, currentStep: 3),
+                  ],
+                ),
               ),
-            ),
 
-            // --- SCROLLABLE AREA ---
-            Expanded(
-              // ✅ 2. Wrap ScrollView in Container with Top Alignment
-              // This forces the scroll view to anchor to the top of the expanded space
-              child: Container(
-                alignment: Alignment.topCenter,
+              // --- SCROLLABLE AREA ---
+              Expanded(
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
                   child: Column(
-                    // ✅ 3. Inner Column must also start at top
-                    mainAxisAlignment: MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // A. SUMMARY LIST (Always at Top)
-                      if (_data.beneficiaries.isNotEmpty)
+                      // A. SUMMARY LIST (Hide if editing new one)
+                      if (!_isAddingNew && _data.beneficiaries.isNotEmpty)
                         ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          padding: EdgeInsets.zero, // Remove default padding
                           itemCount: _data.beneficiaries.length,
                           itemBuilder: (ctx, index) {
-                            if (_editingIndex != null &&
-                                index == _editingIndex) {
-                              return const SizedBox.shrink();
-                            }
                             return _buildSummaryCard(
                               _data.beneficiaries[index],
                               index,
@@ -245,99 +388,61 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                           },
                         ),
 
-                      // B. INPUT FORM or ADD BUTTONS
+                      // B. INPUT FORM OR ADD BUTTON
                       if (_isAddingNew)
+                        _buildInputForm()
+                      else if (_data.beneficiaries.length < 5)
                         Padding(
                           padding: const EdgeInsets.only(top: 10),
-                          child: _buildInputForm(),
-                        )
-                      else if (_data.beneficiaries.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: _buildBigAddButton(),
-                        )
-                      else if (_data.beneficiaries.length < 5)
-                        // Small Add Button (Right Aligned, Below List)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 10),
-                            child: InkWell(
-                              onTap: () => setState(() {
-                                _editingIndex = null;
-                                _isAddingNew = true;
-                              }),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.add_circle_outline,
-                                      size: 18,
-                                      color: AppColors.primary,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      "Add More",
-                                      style: GoogleFonts.roboto(
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
+                          child: _data.beneficiaries.isEmpty
+                              ? _buildBigAddButton()
+                              : _buildSmallAddButton(),
                         ),
                     ],
                   ),
                 ),
               ),
-            ),
 
-            // --- FOOTER BUTTON ---
-            if (!_isAddingNew)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PaymentScreen(),
+              // --- FOOTER BUTTON (Only show when NOT adding/editing) ---
+              if (!_isAddingNew)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _onNextPressed,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _data.beneficiaries.isEmpty
-                          ? Colors.grey.shade400
-                          : AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    child: Text(
-                      _data.beneficiaries.isEmpty
-                          ? "SKIP STEP"
-                          : "NEXT: PAYMENT",
-                      style: GoogleFonts.roboto(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              _data.beneficiaries.isEmpty
+                                  ? "SKIP STEP"
+                                  : "NEXT: PAYMENT",
+                              style: GoogleFonts.roboto(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -356,7 +461,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 5),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5),
         ],
       ),
       child: Row(
@@ -365,7 +470,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: AppColors.primary.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.person, color: AppColors.primary),
@@ -383,7 +488,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                   ),
                 ),
                 Text(
-                  "${person.relation} • ${person.dob}",
+                  "${person.relation} • ${person.gender}",
                   style: GoogleFonts.roboto(color: Colors.grey, fontSize: 12),
                 ),
               ],
@@ -407,13 +512,18 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   }
 
   Widget _buildInputForm() {
-    bool isComplete = _currentFrontPhoto != null && _currentBackPhoto != null;
+    bool isPhotosComplete =
+        _currentFrontPhoto != null && _currentBackPhoto != null;
     return Container(
       padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        ],
       ),
       child: Form(
         key: _formKey,
@@ -481,13 +591,13 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
             const RegistrationLabel("Aadhar Number"),
             RegistrationTextField(
               controller: _aadharController,
-              hint: "Number",
+              hint: "12 Digit Number",
               keyboardType: TextInputType.number,
               focusNode: _aadharFocusNode,
-              suffixIcon: isComplete
+              suffixIcon: isPhotosComplete
                   ? Icons.check_circle
                   : Icons.camera_alt_outlined,
-              isSuffixSuccess: isComplete,
+              isSuffixSuccess: isPhotosComplete,
               onSuffixTap: () {
                 if (_currentFrontPhoto == null) {
                   ImagePickerUtils.showSourceSelection(
@@ -515,11 +625,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                         file: _currentFrontPhoto,
                         onDelete: () =>
                             setState(() => _currentFrontPhoto = null),
-                        onTap: () => ImagePickerUtils.showSourceSelection(
-                          context,
-                          onImagePicked: (f) =>
-                              setState(() => _currentFrontPhoto = f),
-                        ),
+                        onTap: () {},
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -529,11 +635,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                         file: _currentBackPhoto,
                         onDelete: () =>
                             setState(() => _currentBackPhoto = null),
-                        onTap: () => ImagePickerUtils.showSourceSelection(
-                          context,
-                          onImagePicked: (f) =>
-                              setState(() => _currentBackPhoto = f),
-                        ),
+                        onTap: () {},
                       ),
                     ),
                   ],
@@ -545,7 +647,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
               width: double.infinity,
               height: 45,
               child: ElevatedButton(
-                onPressed: _saveBeneficiary,
+                onPressed: _saveBeneficiaryToList, // Saves to Local List
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
@@ -590,7 +692,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: AppColors.primary.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -606,6 +708,41 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmallAddButton() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: InkWell(
+        onTap: () => setState(() {
+          _editingIndex = null;
+          _isAddingNew = true;
+        }),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.add_circle_outline,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                "Add More",
+                style: GoogleFonts.roboto(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -695,7 +832,6 @@ class DashedBorderPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = strokeWidth
       ..style = PaintingStyle.stroke;
-
     final Path path = Path()
       ..addRRect(
         RRect.fromRectAndRadius(
@@ -717,7 +853,6 @@ class DashedBorderPainter extends CustomPainter {
         distance += dashWidth + gap;
       }
     }
-
     canvas.drawPath(dashedPath, paint);
   }
 

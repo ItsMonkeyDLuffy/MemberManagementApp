@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 // 1. Rename imports to avoid confusion
 import '../../../../data/models/beneficiary_model.dart'
     as db; // The Database Model
-import '../screens/new_member_registration/model/beneficiary_input.dart'
+import '../new_member_registration/model/beneficiary_input.dart'
     as ui; // The Form Input
 
 import '../../../../data/repositories/interfaces/beneficiary_repository.dart';

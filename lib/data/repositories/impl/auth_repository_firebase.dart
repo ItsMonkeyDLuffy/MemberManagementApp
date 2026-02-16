@@ -34,13 +34,15 @@ class AuthRepositoryFirebase implements AuthRepository {
     final user = userCredential.user;
 
     if (user != null) {
-      // FIX: Matches the new UserModel definition from Phase 2
+      // ✅ FIX: Added 'updatedAt' and correct default values
       return UserModel(
-        uid: user.uid, // Changed from firebaseUid to uid
+        uid: user.uid,
         mobileNo: user.phoneNumber ?? '',
-        createdAt: DateTime.now(), // Required field added
-        status: 'PENDING', // Default status
-        role: 'member', // Default role
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(), // 🟢 Added this required field
+        status: 'INCOMPLETE', // 🟢 Changed default to INCOMPLETE for new flow
+        role: 'member',
+        currentStep: 1, // 🟢 Default start step
       );
     }
     return null;
@@ -50,11 +52,15 @@ class AuthRepositoryFirebase implements AuthRepository {
   Future<UserModel?> getCurrentUser() async {
     final user = _firebaseAuth.currentUser;
     if (user != null) {
+      // Note: This returns a basic object.
+      // ideally, you should fetch the full profile from Firestore here.
       return UserModel(
         uid: user.uid,
         mobileNo: user.phoneNumber ?? '',
-        createdAt: DateTime.now(), // Placeholder, normally fetched from DB
+        createdAt: DateTime.now(), // Placeholder
+        updatedAt: DateTime.now(), // 🟢 Added this required field
         status: 'PENDING',
+        currentStep: 1,
       );
     }
     return null;

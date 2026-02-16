@@ -5,7 +5,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/widgets/gradient_background.dart';
 import '../../../core/widgets/dharma_app_bar.dart';
 import '../../../core/enums/app_bar_type.dart';
-import 'package:member_management_app/features/member/screens/member_login_screen.dart'; // Adjust path as needed
+import 'package:member_management_app/routes/app_routes.dart'; // Adjust path as needed
 
 class PublicHomePage extends StatelessWidget {
   const PublicHomePage({super.key});
@@ -19,10 +19,7 @@ class PublicHomePage extends StatelessWidget {
       appBar: DharmaAppBar(
         type: DharmaAppBarType.publicHome,
         onPrimaryAction: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MemberLoginScreen()),
-          );
+          Navigator.pushNamed(context, AppRoutes.login);
         },
       ),
 
