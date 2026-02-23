@@ -25,11 +25,11 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       backgroundColor: AppColors.white.withValues(alpha: 0.98),
       elevation: 4,
-      shadowColor: Colors.black.withValues(alpha: 5),
+      shadowColor: Colors.black.withValues(alpha: 0.5), // Fixed alpha value
       toolbarHeight: 70,
       automaticallyImplyLeading: false,
 
-      // ✅ 1. FIXED BACK BUTTON LOGIC
+      // ✅ BACK BUTTON (Still uses onPrimaryAction to go to Public Home)
       leadingWidth: showBackButton ? 60 : 0,
       leading: showBackButton
           ? Container(
@@ -45,7 +45,6 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
                   color: AppColors.white,
                   size: 22,
                 ),
-                // 👇 THIS IS THE KEY FIX 👇
                 onPressed: () {
                   if (onPrimaryAction != null) {
                     onPrimaryAction!();
@@ -129,7 +128,16 @@ class DharmaAppBar extends StatelessWidget implements PreferredSizeWidget {
 
       case DharmaAppBarType.login:
         return GestureDetector(
-          onTap: onPrimaryAction,
+          // ✅ CHANGED: Logic decoupled from onPrimaryAction
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("Admin Login coming soon!"),
+                duration: Duration(seconds: 2),
+                backgroundColor: AppColors.primary,
+              ),
+            );
+          },
           child: Center(
             child: Text(
               "Admin Login",

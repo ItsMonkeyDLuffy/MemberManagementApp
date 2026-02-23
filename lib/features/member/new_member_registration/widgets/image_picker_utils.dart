@@ -7,7 +7,7 @@ import '/core/constants/colors.dart';
 
 // ✅ IMPORT YOUR NEW CUSTOM CAMERA SCREEN
 // (Ensure this path matches where you saved custom_camera_screen.dart)
-import '../../../../shared/screens/custom_camera_screen.dart';
+import '../../../shared/screens/custom_camera_screen.dart';
 
 class ImagePickerUtils {
   static final ImagePicker _picker = ImagePicker();

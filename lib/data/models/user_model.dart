@@ -4,7 +4,8 @@ class UserModel {
   // Core Identifiers
   final String uid;
   final String mobileNo;
-  final String? memberId; // Generated only AFTER approval (e.g., MEM001)
+  final String? memberId; // Generated AFTER approval (e.g., MEM-2026-001)
+  final String? regId; // Generated ON SIGNUP (e.g., REG-2026-001) ✅ ADDED
 
   // App Logic Fields
   final String role; // 'member', 'admin'
@@ -16,28 +17,31 @@ class UserModel {
   // Data Sections (Nullable because they might not be filled yet)
   final PersonalDetails? personalDetails;
   final BankDetails? bankDetails;
-  final List<NomineeDetails>? nominees;
+  final List<BeneficiaryDetails>?
+  beneficiaries; // ✅ Standardized to beneficiaries
 
   UserModel({
     required this.uid,
     required this.mobileNo,
     this.memberId,
+    this.regId, // ✅ ADDED
     this.role = 'member',
-    this.status = 'INCOMPLETE', // Default for new users
-    this.currentStep = 1, // Default start at step 1
+    this.status = 'INCOMPLETE',
+    this.currentStep = 1,
     required this.createdAt,
     required this.updatedAt,
     this.personalDetails,
     this.bankDetails,
-    this.nominees,
+    this.beneficiaries, // ✅ Standardized
   });
 
-  // 1. Convert to Map for Firestore (Handles partial data)
+  // 1. Convert to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
       'mobile_no': mobileNo,
       'member_id': memberId,
+      'reg_id': regId, // ✅ SAVES TO DB
       'role': role,
       'status': status,
       'current_step': currentStep,
@@ -47,8 +51,10 @@ class UserModel {
       // Only save sections if they exist
       if (personalDetails != null) 'personal_details': personalDetails!.toMap(),
       if (bankDetails != null) 'bank_details': bankDetails!.toMap(),
-      if (nominees != null)
-        'nominees': nominees!.map((e) => e.toMap()).toList(),
+      if (beneficiaries != null)
+        'beneficiaries': beneficiaries!
+            .map((e) => e.toMap())
+            .toList(), // ✅ Standardized
     };
   }
 
@@ -58,6 +64,7 @@ class UserModel {
       uid: docId,
       mobileNo: map['mobile_no'] ?? '',
       memberId: map['member_id'],
+      regId: map['reg_id'], // ✅ LOADS FROM DB
       role: map['role'] ?? 'member',
       status: map['status'] ?? 'INCOMPLETE',
       currentStep: map['current_step'] ?? 1,
@@ -75,17 +82,53 @@ class UserModel {
           ? BankDetails.fromMap(map['bank_details'])
           : null,
 
-      nominees: map['nominees'] != null
-          ? (map['nominees'] as List)
-                .map((e) => NomineeDetails.fromMap(e))
+      // ✅ Reads 'beneficiaries', but falls back to 'nominees' so old data isn't lost
+      beneficiaries: map['beneficiaries'] != null
+          ? (map['beneficiaries'] as List)
+                .map((e) => BeneficiaryDetails.fromMap(e))
                 .toList()
-          : [],
+          : (map['nominees'] != null
+                ? (map['nominees'] as List)
+                      .map((e) => BeneficiaryDetails.fromMap(e))
+                      .toList()
+                : []),
+    );
+  }
+
+  // ✅ 3. CopyWith (Critical for updating state locally)
+  UserModel copyWith({
+    String? uid,
+    String? mobileNo,
+    String? memberId,
+    String? regId,
+    String? role,
+    String? status,
+    int? currentStep,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    PersonalDetails? personalDetails,
+    BankDetails? bankDetails,
+    List<BeneficiaryDetails>? beneficiaries, // ✅ Standardized
+  }) {
+    return UserModel(
+      uid: uid ?? this.uid,
+      mobileNo: mobileNo ?? this.mobileNo,
+      memberId: memberId ?? this.memberId,
+      regId: regId ?? this.regId,
+      role: role ?? this.role,
+      status: status ?? this.status,
+      currentStep: currentStep ?? this.currentStep,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      personalDetails: personalDetails ?? this.personalDetails,
+      bankDetails: bankDetails ?? this.bankDetails,
+      beneficiaries: beneficiaries ?? this.beneficiaries, // ✅ Standardized
     );
   }
 }
 
 // ==========================================
-// 🧩 SUB-MODELS (Keeps Firestore Clean)
+// 🧩 SUB-MODELS
 // ==========================================
 
 class PersonalDetails {
@@ -159,36 +202,49 @@ class BankDetails {
   }
 }
 
-class NomineeDetails {
+// ✅ RENAMED to BeneficiaryDetails
+class BeneficiaryDetails {
+  final String? id; // ✅ ADDED
   final String name;
   final String relation;
   final String dob;
   final String aadhaar;
-  final String gender; // ✅ ADDED THIS
+  final String gender;
+  final String? frontUrl; // ✅ ADDED
+  final String? backUrl; // ✅ ADDED
 
-  NomineeDetails({
+  BeneficiaryDetails({
+    this.id, // ✅ ADDED
     required this.name,
     required this.relation,
     required this.dob,
     required this.aadhaar,
-    this.gender = 'Male', // ✅ DEFAULT VALUE FOR SAFETY
+    this.gender = 'Male',
+    this.frontUrl, // ✅ ADDED
+    this.backUrl, // ✅ ADDED
   });
 
   Map<String, dynamic> toMap() => {
+    'id': id, // ✅ ADDED
     'name': name,
     'relation': relation,
     'dob': dob,
     'aadhaar': aadhaar,
-    'gender': gender, // ✅ SAVES TO FIRESTORE
+    'gender': gender,
+    'front_url': frontUrl, // ✅ ADDED
+    'back_url': backUrl, // ✅ ADDED
   };
 
-  factory NomineeDetails.fromMap(Map<String, dynamic> map) {
-    return NomineeDetails(
+  factory BeneficiaryDetails.fromMap(Map<String, dynamic> map) {
+    return BeneficiaryDetails(
+      id: map['id'], // ✅ ADDED
       name: map['name'] ?? '',
       relation: map['relation'] ?? '',
       dob: map['dob'] ?? '',
       aadhaar: map['aadhaar'] ?? '',
-      gender: map['gender'] ?? 'Male', // ✅ LOADS FROM FIRESTORE
+      gender: map['gender'] ?? 'Male',
+      frontUrl: map['front_url'], // ✅ ADDED
+      backUrl: map['back_url'], // ✅ ADDED
     );
   }
 }

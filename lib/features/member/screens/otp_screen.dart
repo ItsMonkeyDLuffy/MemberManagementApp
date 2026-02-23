@@ -8,7 +8,8 @@ import '../../../core/constants/colors.dart';
 import '../../../core/widgets/dharma_app_bar.dart';
 import '../../../core/enums/app_bar_type.dart';
 import '../../../core/widgets/gradient_background.dart';
-// import 'package:member_management_app/routes/app_routes.dart'; // Ensure this exists
+// ✅ Keep this import to access route names
+import 'package:member_management_app/routes/app_routes.dart';
 
 class OtpScreen extends StatefulWidget {
   final String mobileNumber;
@@ -21,30 +22,39 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final TextEditingController _otpController = TextEditingController();
 
-  // ✅ UPDATED: Now accepts a Route Name (String) instead of bool
-  // The Controller decides the destination, the UI just executes it.
+  // ✅ FIXED NAVIGATION LOGIC
   void _handleNavigation(String routeName) {
-    debugPrint("🚀 Navigating to: $routeName");
+    debugPrint("🚀 AuthController suggested: $routeName");
 
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      routeName,
-      (route) => false, // Clear history so they can't go back to Login
-    );
+    String targetRoute = routeName;
+
+    // 🛑 OVERRIDE: FORCE START AT STEP 1
+    // If the user is "Incomplete" (Step 2, 3, or 4), we send them back to Step 1.
+    // This prevents the "Black Screen" crash because it ensures they start
+    // at the beginning of the flow. The Auto-Fill logic will handle the rest.
+    if (routeName.contains('registration') ||
+        routeName.contains('step2') ||
+        routeName.contains('step3') ||
+        routeName.contains('step4')) {
+      debugPrint(
+        "🔄 Redirecting to Step 1 to ensure valid Navigation Stack...",
+      );
+      targetRoute = AppRoutes.registrationStep1;
+    }
+
+    // Clear history and go to the target
+    Navigator.pushNamedAndRemoveUntil(context, targetRoute, (route) => false);
   }
 
   @override
   Widget build(BuildContext context) {
-    // 1. Listen to AuthController
     final authController = Provider.of<AuthController>(context);
     final screenWidth = MediaQuery.of(context).size.width;
 
-    // 2. Keyboard & Layout Calculations
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final double topBarrierHeight =
         MediaQuery.of(context).padding.top + kToolbarHeight - 50;
 
-    // 3. Pin Theme Styling
     final defaultPinTheme = PinTheme(
       width: 48,
       height: 52,
@@ -143,7 +153,6 @@ class _OtpScreenState extends State<OtpScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Icon
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: const BoxDecoration(
@@ -158,7 +167,6 @@ class _OtpScreenState extends State<OtpScreen> {
                           ),
                           const SizedBox(height: 18),
 
-                          // Title
                           Text(
                             "VERIFICATION",
                             style: GoogleFonts.anekDevanagari(
@@ -170,7 +178,6 @@ class _OtpScreenState extends State<OtpScreen> {
                           ),
                           const SizedBox(height: 6),
 
-                          // Subtitle with Number
                           RichText(
                             textAlign: TextAlign.center,
                             text: TextSpan(
@@ -196,7 +203,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
                           const SizedBox(height: 24),
 
-                          // 🔢 PIN INPUT (PINPUT)
+                          // 🔢 PIN INPUT
                           Pinput(
                             length: 6,
                             controller: _otpController,
@@ -206,14 +213,15 @@ class _OtpScreenState extends State<OtpScreen> {
                             showCursor: true,
                             pinputAutovalidateMode:
                                 PinputAutovalidateMode.onSubmit,
-
-                            // 🚀 Trigger Verify on Completion
+                            // ✅ Trigger Verify on Completion
                             onCompleted: (pin) {
+                              // Hide keyboard
+                              FocusScope.of(context).unfocus();
+                              // Call verify
                               authController.verifyOtp(pin, _handleNavigation);
                             },
                           ),
 
-                          // ⚠️ Error Message
                           if (authController.errorMessage != null)
                             Padding(
                               padding: const EdgeInsets.only(top: 12),
@@ -237,6 +245,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               onPressed: authController.isLoading
                                   ? null
                                   : () {
+                                      FocusScope.of(context).unfocus();
                                       authController.verifyOtp(
                                         _otpController.text.trim(),
                                         _handleNavigation,
@@ -272,10 +281,9 @@ class _OtpScreenState extends State<OtpScreen> {
 
                           const SizedBox(height: 16),
 
-                          // Resend Link
                           GestureDetector(
                             onTap: () {
-                              // Call resend logic here
+                              // Add resend logic here if needed
                             },
                             child: Text(
                               "Didn't receive code? Resend",
@@ -294,7 +302,6 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
               ),
 
-              // Keyboard Spacer
               SizedBox(height: keyboardHeight * 0.55),
             ],
           ),

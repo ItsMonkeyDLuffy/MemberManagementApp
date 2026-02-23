@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart'; // <-- ADDED: Required for SystemChannels
 
 // ✅ Import Routes & Repo
 import 'package:member_management_app/routes/app_routes.dart';
@@ -13,11 +14,11 @@ import '../../../../data/repositories/interfaces/member_repository.dart';
 import '../../../../core/constants/colors.dart';
 
 // ✅ Shared Widgets
-import 'widgets_registration/registration_wrapper.dart';
-import 'widgets_registration/registration_card.dart';
-import 'widgets_registration/form_components.dart';
-import 'widgets_registration/document_thumbnail.dart';
-import 'widgets_registration/image_picker_utils.dart';
+import '../widgets/registration_wrapper.dart';
+import '../widgets/registration_card.dart';
+import '../widgets/form_components.dart';
+import '../widgets/document_thumbnail.dart';
+import '../widgets/image_picker_utils.dart';
 
 // ✅ Logic
 import '../registration_data_manager.dart';
@@ -36,7 +37,8 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   final _data = RegistrationDataManager(); // ✅ Singleton
 
   bool _isAddingNew = false;
-  bool _isSaving = false; // To show loader on "Next"
+  bool _isSaving = false;
+  bool _isInitializing = true;
   int? _editingIndex;
 
   // Controllers
@@ -44,15 +46,16 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _aadharController = TextEditingController();
 
-  // Dummy focus nodes
   final FocusNode _aadharFocusNode = FocusNode();
   final FocusNode _dummyFocusNode = FocusNode();
 
-  // Form Values
   String _selectedGender = 'Male';
   String? _selectedRelation;
   File? _currentFrontPhoto;
   File? _currentBackPhoto;
+  // ✅ ADDED: State for URLs to load images from Firestore
+  String? _currentFrontUrl;
+  String? _currentBackUrl;
 
   final List<String> _relations = [
     'Father',
@@ -66,6 +69,54 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _fetchExistingData();
+  }
+
+  // ✅ FIXED: Updated to use 'beneficiaries' instead of 'nominees'
+  Future<void> _fetchExistingData() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _isInitializing = false);
+      return;
+    }
+
+    try {
+      final user = await context.read<MemberRepository>().getUserDetails(uid);
+
+      if (user != null && mounted) {
+        // ✅ Standardized: Read from beneficiaries (the name we set in UserModel)
+        final savedList = user.beneficiaries;
+
+        if (savedList != null && savedList.isNotEmpty) {
+          setState(() {
+            _data.beneficiaries = savedList.map<BeneficiaryInput>((n) {
+              // ✅ Access properties directly from the BeneficiaryDetails object
+              return BeneficiaryInput(
+                id: n.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                name: n.name,
+                relation: n.relation,
+                dob: n.dob,
+                gender: n.gender,
+                aadhar: n.aadhaar,
+                frontPhoto: null,
+                backPhoto: null,
+                frontUrl: n.frontUrl,
+                backUrl: n.backUrl,
+              );
+            }).toList();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching beneficiaries: $e");
+    } finally {
+      if (mounted) setState(() => _isInitializing = false);
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _dobController.dispose();
@@ -73,99 +124,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
     _aadharFocusNode.dispose();
     _dummyFocusNode.dispose();
     super.dispose();
-  }
-
-  // ==========================================
-  // 🛑 UNIFIED EXIT LOGIC (Added for Safety)
-  // ==========================================
-  Future<void> _handleExit() async {
-    final shouldExit = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        elevation: 10,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.warning_amber_rounded,
-                color: AppColors.primary,
-                size: 32,
-              ),
-            ),
-            const SizedBox(height: 15),
-            Text(
-              "Exit Registration?",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.anekDevanagari(
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                color: Colors.black87,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          "Your unsaved progress will be lost. Are you sure?",
-          textAlign: TextAlign.center,
-          style: GoogleFonts.roboto(
-            fontSize: 15,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  child: Text(
-                    "Yes, Exit",
-                    style: GoogleFonts.roboto(
-                      color: Colors.redAccent,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                  ),
-                  child: Text(
-                    "No, Stay",
-                    style: GoogleFonts.roboto(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-
-    if (shouldExit == true) {
-      if (!mounted) return;
-      _data.clearData();
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRoutes.login,
-        (route) => false,
-      );
-    }
   }
 
   // ==========================================
@@ -181,6 +139,8 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       _selectedRelation = null;
       _currentFrontPhoto = null;
       _currentBackPhoto = null;
+      _currentFrontUrl = null; // ✅ Reset URL
+      _currentBackUrl = null; // ✅ Reset URL
       _isAddingNew = false;
       _editingIndex = null;
     });
@@ -196,13 +156,19 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       _selectedGender = person.gender;
       _currentFrontPhoto = person.frontPhoto;
       _currentBackPhoto = person.backPhoto;
+      _currentFrontUrl = person.frontUrl; // ✅ Load URL into state
+      _currentBackUrl = person.backUrl; // ✅ Load URL into state
 
       _editingIndex = index;
-      _isAddingNew = true; // Open the form
+      _isAddingNew = true;
     });
   }
 
   void _saveBeneficiaryToList() {
+    // <-- ADDED: Strongest way to kill keyboard
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+
     FocusScope.of(context).unfocus();
 
     if (_formKey.currentState!.validate()) {
@@ -213,9 +179,21 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         return;
       }
 
-      // Create the Object
+      // ✅ Validation for photos (Checks File OR URL)
+      bool hasFront = _currentFrontPhoto != null || _currentFrontUrl != null;
+      bool hasBack = _currentBackPhoto != null || _currentBackUrl != null;
+
+      if (_aadharController.text.isNotEmpty && (!hasFront || !hasBack)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please upload BOTH Aadhar photos"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       final newPerson = BeneficiaryInput(
-        // If editing, keep ID. If new, generate ID.
         id: _editingIndex != null
             ? _data.beneficiaries[_editingIndex!].id
             : DateTime.now().millisecondsSinceEpoch.toString(),
@@ -226,6 +204,8 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         aadhar: _aadharController.text,
         frontPhoto: _currentFrontPhoto,
         backPhoto: _currentBackPhoto,
+        frontUrl: _currentFrontUrl, // ✅ Pass URL to model
+        backUrl: _currentBackUrl, // ✅ Pass URL to model
       );
 
       setState(() {
@@ -236,7 +216,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         }
       });
 
-      _resetForm(); // Close form and go back to list
+      _resetForm();
     }
   }
 
@@ -248,41 +228,74 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   }
 
   // ==========================================
-  // 💾 LOGIC: CLOUD SAVE (AUTO-SAVE)
+  // 💾 LOGIC: CLOUD SAVE
   // ==========================================
   Future<void> _onNextPressed() async {
+    // <-- ADDED: Strongest way to kill keyboard
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+
     setState(() => _isSaving = true);
 
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
+      final repo = context.read<MemberRepository>();
 
-      // 1. Convert UI List to Firestore List (Map)
-      // Note: We only save text data to Firestore draft.
-      final nomineesList = _data.beneficiaries
-          .map(
-            (b) => {
-              'name': b.name,
-              'relation': b.relation,
-              'dob': b.dob,
-              'aadhaar': b.aadhar,
-              'gender': b.gender,
-            },
-          )
-          .toList();
+      List<Future<String>> uploadTasks = [];
+      List<Map<String, dynamic>> nomineesPayload = [];
 
-      // 2. Prepare Data Payload
-      final draftData = {
-        'current_step': 4, // Next time they login, they go to Payment (Step 4)
-        'nominees': nomineesList,
-      };
+      for (var person in _data.beneficiaries) {
+        Future<String>? frontUpload;
+        Future<String>? backUpload;
 
-      // 3. Save to Firestore
-      await context.read<MemberRepository>().saveMemberDraft(
-        uid: uid,
-        data: draftData,
-      );
+        if (person.frontPhoto != null) {
+          String fileName = 'nominee_${person.id}_front';
+          frontUpload = repo.uploadImage(uid, person.frontPhoto!, fileName);
+        }
 
-      // 4. Navigate
+        if (person.backPhoto != null) {
+          String fileName = 'nominee_${person.id}_back';
+          backUpload = repo.uploadImage(uid, person.backPhoto!, fileName);
+        }
+
+        nomineesPayload.add({
+          'id': person.id, // Ensure ID goes into DB
+          'name': person.name,
+          'relation': person.relation,
+          'dob': person.dob,
+          'aadhaar': person.aadhar,
+          'gender': person.gender,
+          'front_url': person.frontUrl, // ✅ Retain existing URL if present
+          'back_url': person.backUrl, // ✅ Retain existing URL if present
+          '_frontTask': frontUpload,
+          '_backTask': backUpload,
+        });
+
+        if (frontUpload != null) uploadTasks.add(frontUpload);
+        if (backUpload != null) uploadTasks.add(backUpload);
+      }
+
+      // Execute all image uploads concurrently
+      if (uploadTasks.isNotEmpty) {
+        await Future.wait(uploadTasks);
+      }
+
+      // Map the completed URLs back to the payload
+      for (var payload in nomineesPayload) {
+        if (payload['_frontTask'] != null) {
+          payload['front_url'] = await payload['_frontTask'];
+        }
+        if (payload['_backTask'] != null) {
+          payload['back_url'] = await payload['_backTask'];
+        }
+        payload.remove('_frontTask');
+        payload.remove('_backTask');
+      }
+
+      final draftData = {'current_step': 4, 'nominees': nomineesPayload};
+
+      await repo.saveMemberDraft(uid: uid, data: draftData);
+
       if (mounted) {
         setState(() => _isSaving = false);
         Navigator.pushNamed(context, AppRoutes.registrationStep4);
@@ -290,14 +303,18 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error saving draft: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error saving beneficiaries: $e")),
+        );
       }
     }
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    // <-- ADDED: Prevent keyboard pop up on opening picker
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+
     FocusScope.of(context).requestFocus(_dummyFocusNode);
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -311,6 +328,11 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         child: child!,
       ),
     );
+
+    // <-- ADDED: Ensure keyboard stays closed when picker returns
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+
     if (picked != null) {
       setState(() {
         _dobController.text = DateFormat('dd-MM-yyyy').format(picked);
@@ -323,126 +345,142 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   // ==========================================
   @override
   Widget build(BuildContext context) {
+    // ✅ MOVED: We no longer return a full Scaffold loader here.
+    // This allows the Wrapper and Card to build immediately.
+
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final double bottomPadding = keyboardHeight > 70
         ? keyboardHeight - 70
         : 10.0;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        await _handleExit();
+    return WillPopScope(
+      onWillPop: () async {
+        // <-- ADDED: Kill keyboard before going back via hardware button
+        FocusManager.instance.primaryFocus?.unfocus();
+        SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+        Navigator.pop(context);
+        return false;
       },
       child: RegistrationWrapper(
-        onBack: _handleExit, // ✅ Calls safety check
+        onBack: () {
+          // <-- ADDED: Kill keyboard before going back via UI arrow
+          FocusManager.instance.primaryFocus?.unfocus();
+          SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+          Navigator.pop(context);
+        },
         child: RegistrationCard(
-          child: Column(
-            children: [
-              // --- HEADER ---
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 25, 20, 10),
-                child: Column(
+          // ✅ FIX: Show loader INSIDE the card if initializing
+          child: _isInitializing
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+              : Column(
                   children: [
-                    Text(
-                      "MEMBER REGISTRATION",
-                      style: GoogleFonts.anekDevanagari(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 25, 20, 10),
+                      child: Column(
+                        children: [
+                          Text(
+                            "MEMBER REGISTRATION",
+                            style: GoogleFonts.anekDevanagari(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Step 3 of 4: Beneficiaries (${_data.beneficiaries.length}/5)",
+                            style: GoogleFonts.anekDevanagari(
+                              fontSize: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const ProgressPills(totalSteps: 4, currentStep: 3),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Step 3 of 4: Beneficiaries (${_data.beneficiaries.length}/5)",
-                      style: GoogleFonts.anekDevanagari(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const ProgressPills(totalSteps: 4, currentStep: 3),
-                  ],
-                ),
-              ),
 
-              // --- SCROLLABLE AREA ---
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const ClampingScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // A. SUMMARY LIST (Hide if editing new one)
-                      if (!_isAddingNew && _data.beneficiaries.isNotEmpty)
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _data.beneficiaries.length,
-                          itemBuilder: (ctx, index) {
-                            return _buildSummaryCard(
-                              _data.beneficiaries[index],
-                              index,
-                            );
-                          },
-                        ),
-
-                      // B. INPUT FORM OR ADD BUTTON
-                      if (_isAddingNew)
-                        _buildInputForm()
-                      else if (_data.beneficiaries.length < 5)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 10),
-                          child: _data.beneficiaries.isEmpty
-                              ? _buildBigAddButton()
-                              : _buildSmallAddButton(),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // --- FOOTER BUTTON (Only show when NOT adding/editing) ---
-              if (!_isAddingNew)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _onNextPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisAlignment: MainAxisAlignment
+                              .start, // ✅ Added start alignment
+                          children: [
+                            if (!_isAddingNew && _data.beneficiaries.isNotEmpty)
+                              ListView.builder(
+                                shrinkWrap: true,
+                                padding: EdgeInsets
+                                    .zero, // ✅ Removes hidden Flutter ListView padding
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _data.beneficiaries.length,
+                                itemBuilder: (ctx, index) {
+                                  return _buildSummaryCard(
+                                    _data.beneficiaries[index],
+                                    index,
+                                  );
+                                },
                               ),
-                            )
-                          : Text(
-                              _data.beneficiaries.isEmpty
-                                  ? "SKIP STEP"
-                                  : "NEXT: PAYMENT",
-                              style: GoogleFonts.roboto(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
+
+                            if (_isAddingNew)
+                              _buildInputForm()
+                            else if (_data.beneficiaries.length < 5)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: _data.beneficiaries.isEmpty
+                                    ? _buildBigAddButton()
+                                    : _buildSmallAddButton(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    if (!_isAddingNew)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: _isSaving ? null : _onNextPressed,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                    ),
-                  ),
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    _data.beneficiaries.isEmpty
+                                        ? "SKIP STEP"
+                                        : "NEXT: PAYMENT",
+                                    style: GoogleFonts.roboto(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
       ),
     );
@@ -512,8 +550,11 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   }
 
   Widget _buildInputForm() {
+    // ✅ Include URLs in check
     bool isPhotosComplete =
-        _currentFrontPhoto != null && _currentBackPhoto != null;
+        (_currentFrontPhoto != null || _currentFrontUrl != null) &&
+        (_currentBackPhoto != null || _currentBackUrl != null);
+
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(bottom: 20),
@@ -599,7 +640,11 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                   : Icons.camera_alt_outlined,
               isSuffixSuccess: isPhotosComplete,
               onSuffixTap: () {
-                if (_currentFrontPhoto == null) {
+                // <-- ADDED: Kill keyboard before ImagePicker
+                FocusManager.instance.primaryFocus?.unfocus();
+                SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+                if (_currentFrontPhoto == null && _currentFrontUrl == null) {
                   ImagePickerUtils.showSourceSelection(
                     context,
                     onImagePicked: (f) =>
@@ -614,7 +659,10 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
               },
             ),
 
-            if (_currentFrontPhoto != null || _currentBackPhoto != null)
+            if (_currentFrontPhoto != null ||
+                _currentBackPhoto != null ||
+                _currentFrontUrl != null ||
+                _currentBackUrl != null)
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Row(
@@ -623,9 +671,24 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                       child: DocumentThumbnail(
                         title: "Front",
                         file: _currentFrontPhoto,
-                        onDelete: () =>
-                            setState(() => _currentFrontPhoto = null),
-                        onTap: () {},
+                        url: _currentFrontUrl, // ✅ Pass URL
+                        onDelete: () => setState(() {
+                          _currentFrontPhoto = null;
+                          _currentFrontUrl = null;
+                        }),
+                        onTap: () {
+                          // <-- ADDED: Kill keyboard before ImagePicker
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          SystemChannels.textInput.invokeMethod(
+                            'TextInput.hide',
+                          );
+
+                          ImagePickerUtils.showSourceSelection(
+                            context,
+                            onImagePicked: (f) =>
+                                setState(() => _currentFrontPhoto = f),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -633,9 +696,24 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                       child: DocumentThumbnail(
                         title: "Back",
                         file: _currentBackPhoto,
-                        onDelete: () =>
-                            setState(() => _currentBackPhoto = null),
-                        onTap: () {},
+                        url: _currentBackUrl, // ✅ Pass URL
+                        onDelete: () => setState(() {
+                          _currentBackPhoto = null;
+                          _currentBackUrl = null;
+                        }),
+                        onTap: () {
+                          // <-- ADDED: Kill keyboard before ImagePicker
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          SystemChannels.textInput.invokeMethod(
+                            'TextInput.hide',
+                          );
+
+                          ImagePickerUtils.showSourceSelection(
+                            context,
+                            onImagePicked: (f) =>
+                                setState(() => _currentBackPhoto = f),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -647,7 +725,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
               width: double.infinity,
               height: 45,
               child: ElevatedButton(
-                onPressed: _saveBeneficiaryToList, // Saves to Local List
+                onPressed: _saveBeneficiaryToList,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
@@ -671,10 +749,16 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
 
   Widget _buildBigAddButton() {
     return GestureDetector(
-      onTap: () => setState(() {
-        _editingIndex = null;
-        _isAddingNew = true;
-      }),
+      onTap: () {
+        // <-- ADDED: Kill keyboard
+        FocusManager.instance.primaryFocus?.unfocus();
+        SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+        setState(() {
+          _editingIndex = null;
+          _isAddingNew = true;
+        });
+      },
       child: CustomPaint(
         painter: DashedBorderPainter(
           color: AppColors.primary,
@@ -721,10 +805,16 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
     return Align(
       alignment: Alignment.centerRight,
       child: InkWell(
-        onTap: () => setState(() {
-          _editingIndex = null;
-          _isAddingNew = true;
-        }),
+        onTap: () {
+          // <-- ADDED: Kill keyboard
+          FocusManager.instance.primaryFocus?.unfocus();
+          SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+          setState(() {
+            _editingIndex = null;
+            _isAddingNew = true;
+          });
+        },
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -790,7 +880,13 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   Widget _buildGenderSelector(String val) {
     bool isSelected = _selectedGender == val;
     return GestureDetector(
-      onTap: () => setState(() => _selectedGender = val),
+      onTap: () {
+        // <-- ADDED: Kill keyboard
+        FocusManager.instance.primaryFocus?.unfocus();
+        SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+        setState(() => _selectedGender = val);
+      },
       child: Row(
         children: [
           Icon(
@@ -812,7 +908,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   }
 }
 
-// 🖊️ DashedBorderPainter
 class DashedBorderPainter extends CustomPainter {
   final Color color;
   final double strokeWidth;

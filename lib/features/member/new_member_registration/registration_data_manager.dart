@@ -65,12 +65,14 @@ class RegistrationDataManager {
       bankName = user.bankDetails!.bankName ?? '';
     }
 
-    // 3. Beneficiaries (✅ FIXED MAPPING)
-    if (user.nominees != null) {
-      beneficiaries = user.nominees!.map((n) {
+    // 3. Beneficiaries (✅ FIXED MAPPING TO BENEFICIARIES)
+    if (user.beneficiaries != null) {
+      beneficiaries = user.beneficiaries!.map((n) {
         return BeneficiaryInput(
           // Generate a temp ID for the UI List
-          id: DateTime.now().millisecondsSinceEpoch.toString() + n.aadhaar,
+          id:
+              n.id ??
+              (DateTime.now().millisecondsSinceEpoch.toString() + n.aadhaar),
 
           name: n.name,
           relation: n.relation,
@@ -81,6 +83,10 @@ class RegistrationDataManager {
 
           // ✅ FIX 2: Map 'gender' from Firestore
           gender: n.gender,
+
+          // ✅ FIX 3: Load existing Cloud URLs for beneficiaries
+          frontUrl: n.frontUrl,
+          backUrl: n.backUrl,
         );
       }).toList();
     }

@@ -10,12 +10,12 @@ import 'features/member/logic/beneficiary_controller.dart';
 // Repository Interface Imports
 import 'data/repositories/interfaces/auth_repository.dart';
 import 'data/repositories/interfaces/member_repository.dart';
-import 'data/repositories/interfaces/beneficiary_repository.dart';
+// ❌ Deleted: BeneficiaryRepository interface import
 
 // Repository Implementation Imports
 import 'data/repositories/impl/auth_repository_firebase.dart';
 import 'data/repositories/impl/member_repository_firestore.dart';
-import 'data/repositories/impl/beneficiary_repository_firestore.dart';
+// ❌ Deleted: BeneficiaryRepository implementation import
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,10 +38,7 @@ void main() async {
         // 2. Inject Member Repository (Firestore)
         Provider<MemberRepository>(create: (_) => MemberRepositoryFirestore()),
 
-        // 3. Inject Beneficiary Repository (Firestore)
-        Provider<BeneficiaryRepository>(
-          create: (_) => BeneficiaryRepositoryFirestore(),
-        ),
+        // ❌ 3. Removed: BeneficiaryRepository injection (No longer needed)
 
         // 4. Inject Auth Controller (Depends on Auth & Member Repos)
         ChangeNotifierProvider<AuthController>(
@@ -51,10 +48,11 @@ void main() async {
           ),
         ),
 
-        // 5. Inject Beneficiary Controller (Depends on Beneficiary & Auth Repos)
+        // 5. Inject Beneficiary Controller (Now depends on MemberRepository)
         ChangeNotifierProvider<BeneficiaryController>(
           create: (context) => BeneficiaryController(
-            repo: context.read<BeneficiaryRepository>(),
+            memberRepo: context
+                .read<MemberRepository>(), // ✅ Updated: memberRepo
             authRepo: context.read<AuthRepository>(),
           ),
         ),

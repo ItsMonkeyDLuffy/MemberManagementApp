@@ -1,17 +1,21 @@
 import 'dart:io';
 
 class BeneficiaryInput {
-  final String id; // ✅ Added ID (Needed for deleting items from list)
-  final String name;
-  final String relation;
-  final String dob;
-  final String gender;
-  final String aadhar;
-  final File? frontPhoto;
-  final File? backPhoto;
+  String id;
+  String name;
+  String relation;
+  String dob;
+  String gender;
+  String aadhar;
+  File? frontPhoto; // Local file (New Upload)
+  File? backPhoto; // Local file (New Upload)
+
+  // ✅ NEW: Add these two fields for Database URLs
+  String? frontUrl;
+  String? backUrl;
 
   BeneficiaryInput({
-    required this.id, // ✅ Required
+    required this.id,
     required this.name,
     required this.relation,
     required this.dob,
@@ -19,5 +23,7 @@ class BeneficiaryInput {
     required this.aadhar,
     this.frontPhoto,
     this.backPhoto,
+    this.frontUrl, // ✅ Add to constructor
+    this.backUrl, // ✅ Add to constructor
   });
 }

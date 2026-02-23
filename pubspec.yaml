@@ -51,6 +51,8 @@ dependencies:
   camera: ^0.10.5
   path_provider: ^2.1.1
   path: ^1.8.3
+  firebase_storage: ^12.4.10
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

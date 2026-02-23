@@ -1,3 +1,4 @@
+import 'dart:io'; // ✅ Needed for File
 import '../../models/user_model.dart';
 
 abstract class MemberRepository {
@@ -21,4 +22,13 @@ abstract class MemberRepository {
 
   // 5. Get User Details
   Future<UserModel?> getUserDetails(String uid);
+
+  // 6. Upload Image to Storage
+  Future<String> uploadImage(String uid, File file, String fileName);
+
+  // 7. Admin: Approve Member (✅ ADDED THIS)
+  Future<void> approveMember(String uid);
+
+  // 8. Admin: Reject Member (✅ ADDED THIS)
+  Future<void> rejectMember(String uid, String reason);
 }

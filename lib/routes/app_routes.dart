@@ -10,7 +10,7 @@ import '../features/member/new_member_registration/screens/personal_info_screen.
 import '../features/member/new_member_registration/screens/bank_details_screen.dart';
 import '../features/member/new_member_registration/screens/benificiary_screen.dart';
 import '../features/member/new_member_registration/screens/payment_screen.dart';
-import 'package:member_management_app/features/member/screens/member_home_screen.dart';
+import 'package:member_management_app/features/member/dashboard/dashboard_screen.dart';
 
 // ✅ Dashboard / Home Screen (Create this file if missing)
 
@@ -43,6 +43,6 @@ class AppRoutes {
     registrationStep4: (context) => const PaymentScreen(),
 
     // ✅ ADDED THIS
-    memberHome: (context) => const MemberHomeScreen(),
+    memberHome: (context) => const DashboardScreen(),
   };
 }

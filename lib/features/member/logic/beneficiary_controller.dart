@@ -1,31 +1,28 @@
 import 'package:flutter/material.dart';
 
-// 1. Rename imports to avoid confusion
-import '../../../../data/models/beneficiary_model.dart'
-    as db; // The Database Model
-import '../new_member_registration/model/beneficiary_input.dart'
-    as ui; // The Form Input
+// ✅ 1. Pointing to your standardized Database Model
+import '../../../../data/models/user_model.dart' as db;
+import '../new_member_registration/model/beneficiary_input.dart' as ui;
 
-import '../../../../data/repositories/interfaces/beneficiary_repository.dart';
+// ✅ 2. Use MemberRepository instead of the deleted BeneficiaryRepository
+import '../../../../data/repositories/interfaces/member_repository.dart';
 import '../../../../data/repositories/interfaces/auth_repository.dart';
 
 class BeneficiaryController extends ChangeNotifier {
-  final BeneficiaryRepository _repo;
+  final MemberRepository _memberRepo; // ✅ Updated
   final AuthRepository _authRepo;
 
   BeneficiaryController({
-    required BeneficiaryRepository repo,
+    required MemberRepository memberRepo, // ✅ Updated
     required AuthRepository authRepo,
-  }) : _repo = repo,
+  }) : _memberRepo = memberRepo,
        _authRepo = authRepo;
 
-  // List stores Database Models
-  List<db.BeneficiaryModel> _beneficiaries = [];
-
+  List<db.BeneficiaryDetails> _beneficiaries = [];
   bool _isLoading = false;
   String? _errorMessage;
 
-  List<db.BeneficiaryModel> get beneficiaries => _beneficiaries;
+  List<db.BeneficiaryDetails> get beneficiaries => _beneficiaries;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -38,7 +35,9 @@ class BeneficiaryController extends ChangeNotifier {
     try {
       final currentUser = await _authRepo.getCurrentUser();
       if (currentUser?.uid != null) {
-        _beneficiaries = await _repo.getBeneficiaries(currentUser!.uid);
+        // ✅ 3. Pull details from the main User document
+        final user = await _memberRepo.getUserDetails(currentUser!.uid);
+        _beneficiaries = user?.beneficiaries ?? [];
       }
     } catch (e) {
       _errorMessage = "Failed to load family: $e";
@@ -49,7 +48,6 @@ class BeneficiaryController extends ChangeNotifier {
   }
 
   // --- ADD MEMBER ---
-  // ✅ Input is 'ui.BeneficiaryInput' (from your form)
   Future<void> addFamilyMember(ui.BeneficiaryInput input) async {
     _isLoading = true;
     _errorMessage = null;
@@ -57,31 +55,32 @@ class BeneficiaryController extends ChangeNotifier {
 
     try {
       final currentUser = await _authRepo.getCurrentUser();
-      if (currentUser?.uid == null) throw Exception("User not logged in");
+      final uid = currentUser?.uid;
+      if (uid == null) throw Exception("User not logged in");
 
-      // 1. Convert UI Input -> Database Model
-      final memberToSend = db.BeneficiaryModel(
-        userId: currentUser!.uid,
+      // 1. Create the new member object
+      final newBeneficiary = db.BeneficiaryDetails(
+        id: input.id,
         name: input.name,
         relation: input.relation,
         dob: input.dob,
-
-        // ✅ Fix 1: Map 'aadhar' (UI) -> 'aadhaarNo' (DB)
-        aadhaarNo: input.aadhar,
-
-        // ❌ Removed 'gender' because your DB model doesn't have it yet.
-        // If you need gender, add 'final String gender;' to BeneficiaryModel first.
-
-        // Optional: Map mobile if your form has it, otherwise null
-        mobileNo: null,
+        aadhaar: input.aadhar,
+        gender: input.gender,
+        frontUrl: input.frontUrl,
+        backUrl: input.backUrl,
       );
 
-      // 2. Send to Repository
-      // ✅ Fix 2: Just await it. Do not try to assign it to a variable.
-      await _repo.addBeneficiary(memberToSend);
+      // 2. Add to existing list and save via MemberRepository
+      final updatedList = List<db.BeneficiaryDetails>.from(_beneficiaries)
+        ..add(newBeneficiary);
 
-      // 3. Refresh the list from server to get the new data
-      await loadBeneficiaries();
+      await _memberRepo.saveMemberDraft(
+        uid: uid,
+        data: {'beneficiaries': updatedList.map((e) => e.toMap()).toList()},
+      );
+
+      // 3. Update local state
+      _beneficiaries = updatedList;
     } catch (e) {
       _errorMessage = "Failed to add member: $e";
     } finally {
@@ -92,15 +91,20 @@ class BeneficiaryController extends ChangeNotifier {
 
   // --- DELETE MEMBER ---
   Future<void> deleteMember(String id) async {
-    // Optimistic update: Remove locally first for speed
-    final originalList = List<db.BeneficiaryModel>.from(_beneficiaries);
+    final uid = (await _authRepo.getCurrentUser())?.uid;
+    if (uid == null) return;
+
+    final originalList = List<db.BeneficiaryDetails>.from(_beneficiaries);
     _beneficiaries.removeWhere((m) => m.id == id);
     notifyListeners();
 
     try {
-      await _repo.deleteBeneficiary(id);
+      // ✅ 4. Save the shortened list back to the User document
+      await _memberRepo.saveMemberDraft(
+        uid: uid,
+        data: {'beneficiaries': _beneficiaries.map((e) => e.toMap()).toList()},
+      );
     } catch (e) {
-      // If error, rollback
       _beneficiaries = originalList;
       _errorMessage = "Failed to delete: $e";
       notifyListeners();
