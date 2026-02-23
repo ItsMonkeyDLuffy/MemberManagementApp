@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'dart:math' as math;
+import 'package:flutter/services.dart'; // ✅ ADDED: Required for formatters and keyboard
 
 // ✅ Logic & Core
 import '../../auth/logic/auth_controller.dart';
@@ -14,6 +16,9 @@ import 'package:member_management_app/routes/app_routes.dart';
 // 👇 IMPORT YOUR PUBLIC HOME SCREEN HERE
 import 'package:member_management_app/features/shared/screens/public_home_page.dart';
 
+// ✅ ADDED: Import Validators
+import '../../../../core/utils/validators.dart';
+
 class MemberLoginScreen extends StatefulWidget {
   const MemberLoginScreen({super.key});
 
@@ -23,7 +28,9 @@ class MemberLoginScreen extends StatefulWidget {
 
 class _MemberLoginScreenState extends State<MemberLoginScreen> {
   final TextEditingController _phoneController = TextEditingController();
-  bool _isPhoneValid = true;
+
+  // ✅ FIXED: Changed from boolean to String to hold the exact Validator error
+  String? _phoneError;
 
   @override
   Widget build(BuildContext context) {
@@ -89,35 +96,37 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                       ),
                     ),
 
-                    // FOOTER
-                    Positioned(
-                      bottom: 20,
-                      left: 0,
-                      right: 0,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextButton(
-                            onPressed: () {},
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              "Need Help?",
-                              style: GoogleFonts.anekDevanagari(
-                                color: AppColors.textSecondary,
-                                fontSize: 14,
-                                decoration: TextDecoration.underline,
+                    // FOOTE// FOOTER
+                    // ✅ FIX: Only draw the footer if the keyboard is NOT open
+                    if (keyboardHeight == 0)
+                      Positioned(
+                        bottom: 20,
+                        left: 0,
+                        right: 0,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: () {},
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                "Need Help?",
+                                style: GoogleFonts.anekDevanagari(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 14,
+                                  decoration: TextDecoration.underline,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 1),
-                          _buildSocialIcons(),
-                        ],
+                            const SizedBox(height: 1),
+                            _buildSocialIcons(context),
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -206,7 +215,8 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                     ),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: _isPhoneValid
+                                      // ✅ Sync border color with new error state
+                                      color: _phoneError == null
                                           ? Colors.black12
                                           : AppColors.error,
                                     ),
@@ -232,7 +242,8 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                       ),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: _isPhoneValid
+                                        // ✅ Sync border color with new error state
+                                        color: _phoneError == null
                                             ? Colors.black12
                                             : AppColors.error,
                                       ),
@@ -241,9 +252,14 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                       controller: _phoneController,
                                       keyboardType: TextInputType.phone,
                                       maxLength: 10,
+                                      // ✅ ADDED: Strict physical formatter blocks everything except numbers
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
                                       onChanged: (val) {
-                                        if (!_isPhoneValid) {
-                                          setState(() => _isPhoneValid = true);
+                                        // Clear error when they start typing again
+                                        if (_phoneError != null) {
+                                          setState(() => _phoneError = null);
                                         }
                                       },
                                       style: GoogleFonts.anekDevanagari(
@@ -273,13 +289,14 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                               ],
                             ),
 
-                            if (!_isPhoneValid)
+                            // ✅ FIXED: Quiet inline validation error text
+                            if (_phoneError != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8, left: 4),
                                 child: SizedBox(
                                   width: double.infinity,
                                   child: Text(
-                                    "Please enter a valid 10-digit number",
+                                    _phoneError!,
                                     style: GoogleFonts.anekDevanagari(
                                       color: AppColors.error,
                                       fontSize: 13.3,
@@ -289,8 +306,9 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                 ),
                               ),
 
+                            // Display API Errors
                             if (authController.errorMessage != null &&
-                                _isPhoneValid)
+                                _phoneError == null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 10),
                                 child: Row(
@@ -324,10 +342,22 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                 onPressed: authController.isLoading
                                     ? null
                                     : () {
+                                        // ✅ Added safety keyboard kill
+                                        FocusManager.instance.primaryFocus
+                                            ?.unfocus();
+                                        SystemChannels.textInput.invokeMethod(
+                                          'TextInput.hide',
+                                        );
+
                                         final phone = _phoneController.text
                                             .trim();
-                                        if (phone.length == 10) {
-                                          setState(() => _isPhoneValid = true);
+
+                                        // ✅ FIXED: Using the centralized Validators class
+                                        final validationError =
+                                            Validators.validateMobile(phone);
+
+                                        if (validationError == null) {
+                                          setState(() => _phoneError = null);
                                           authController.loginWithPhone(
                                             "+91$phone",
                                             () {
@@ -341,7 +371,9 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
                                             },
                                           );
                                         } else {
-                                          setState(() => _isPhoneValid = false);
+                                          setState(
+                                            () => _phoneError = validationError,
+                                          );
                                         }
                                       },
                                 style: ElevatedButton.styleFrom(
@@ -387,39 +419,55 @@ class _MemberLoginScreenState extends State<MemberLoginScreen> {
     );
   }
 
-  Widget _buildSocialIcons() {
+  Widget _buildSocialIcons(BuildContext context) {
+    // ✅ FIX 1: Pass BuildContext
     const Color iconColor = Color(0xFFFF9641);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.youtube),
-          color: iconColor,
-          iconSize: 25,
-          onPressed: () {},
-        ),
-        const SizedBox(width: 4),
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.facebook),
-          color: iconColor,
-          iconSize: 25,
-          onPressed: () {},
-        ),
-        const SizedBox(width: 4),
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.instagram),
-          color: iconColor,
-          iconSize: 25,
-          onPressed: () {},
-        ),
-        const SizedBox(width: 4),
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.xTwitter),
-          color: iconColor,
-          iconSize: 25,
-          onPressed: () {},
-        ),
-      ],
+
+    // ✅ FIX 2: Wrap the Row in Padding
+    return Padding(
+      padding: EdgeInsets.only(
+        // Dynamically add the height of the phone's nav bar + a little extra space
+        bottom: math.max(0.0, MediaQuery.of(context).padding.bottom - 10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // YouTube
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.youtube),
+            color: iconColor, // Official YouTube Red
+            iconSize: 25,
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
+
+          // Facebook
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.facebook),
+            color: iconColor, // Official Facebook Blue
+            iconSize: 25,
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
+
+          // Instagram
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.instagram),
+            color: iconColor, // Official Insta Pink/Red
+            iconSize: 25,
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
+
+          // X (formerly Twitter)
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.xTwitter),
+            color: iconColor, // Official X Black
+            iconSize: 25,
+            onPressed: () {},
+          ),
+        ],
+      ),
     );
   }
 }

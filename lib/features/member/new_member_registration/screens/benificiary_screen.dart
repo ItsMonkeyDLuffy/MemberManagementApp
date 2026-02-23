@@ -25,6 +25,9 @@ import '../registration_data_manager.dart';
 // ✅ Model Import
 import '../model/beneficiary_input.dart';
 
+// ✅ ADDED: Import your Validators class here
+import '../../../../core/utils/validators.dart';
+
 class BeneficiaryScreen extends StatefulWidget {
   const BeneficiaryScreen({super.key});
 
@@ -53,9 +56,13 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   String? _selectedRelation;
   File? _currentFrontPhoto;
   File? _currentBackPhoto;
-  // ✅ ADDED: State for URLs to load images from Firestore
   String? _currentFrontUrl;
   String? _currentBackUrl;
+
+  // ✅ ADDED: State variables for quiet inline errors (Replaces Snackbars)
+  bool _showPhotoError = false;
+  bool _showRelationError = false;
+  String? _submitError;
 
   final List<String> _relations = [
     'Father',
@@ -74,7 +81,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
     _fetchExistingData();
   }
 
-  // ✅ FIXED: Updated to use 'beneficiaries' instead of 'nominees'
   Future<void> _fetchExistingData() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
@@ -86,13 +92,11 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       final user = await context.read<MemberRepository>().getUserDetails(uid);
 
       if (user != null && mounted) {
-        // ✅ Standardized: Read from beneficiaries (the name we set in UserModel)
         final savedList = user.beneficiaries;
 
         if (savedList != null && savedList.isNotEmpty) {
           setState(() {
             _data.beneficiaries = savedList.map<BeneficiaryInput>((n) {
-              // ✅ Access properties directly from the BeneficiaryDetails object
               return BeneficiaryInput(
                 id: n.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
                 name: n.name,
@@ -139,10 +143,14 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       _selectedRelation = null;
       _currentFrontPhoto = null;
       _currentBackPhoto = null;
-      _currentFrontUrl = null; // ✅ Reset URL
-      _currentBackUrl = null; // ✅ Reset URL
+      _currentFrontUrl = null;
+      _currentBackUrl = null;
       _isAddingNew = false;
       _editingIndex = null;
+
+      // ✅ Reset quiet errors
+      _showPhotoError = false;
+      _showRelationError = false;
     });
   }
 
@@ -156,68 +164,77 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       _selectedGender = person.gender;
       _currentFrontPhoto = person.frontPhoto;
       _currentBackPhoto = person.backPhoto;
-      _currentFrontUrl = person.frontUrl; // ✅ Load URL into state
-      _currentBackUrl = person.backUrl; // ✅ Load URL into state
+      _currentFrontUrl = person.frontUrl;
+      _currentBackUrl = person.backUrl;
 
       _editingIndex = index;
       _isAddingNew = true;
+
+      // ✅ Reset quiet errors
+      _showPhotoError = false;
+      _showRelationError = false;
     });
   }
 
   void _saveBeneficiaryToList() {
-    // <-- ADDED: Strongest way to kill keyboard
+    // Kill keyboard
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
-
     FocusScope.of(context).unfocus();
 
-    if (_formKey.currentState!.validate()) {
-      if (_selectedRelation == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please select a relationship")),
-        );
-        return;
-      }
+    // ✅ Reset inline errors on new attempt
+    setState(() {
+      _showRelationError = false;
+      _showPhotoError = false;
+    });
 
-      // ✅ Validation for photos (Checks File OR URL)
-      bool hasFront = _currentFrontPhoto != null || _currentFrontUrl != null;
-      bool hasBack = _currentBackPhoto != null || _currentBackUrl != null;
+    // Run the form validators silently
+    bool isFormValid = _formKey.currentState!.validate();
 
-      if (_aadharController.text.isNotEmpty && (!hasFront || !hasBack)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Please upload BOTH Aadhar photos"),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      final newPerson = BeneficiaryInput(
-        id: _editingIndex != null
-            ? _data.beneficiaries[_editingIndex!].id
-            : DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _nameController.text,
-        relation: _selectedRelation!,
-        dob: _dobController.text,
-        gender: _selectedGender,
-        aadhar: _aadharController.text,
-        frontPhoto: _currentFrontPhoto,
-        backPhoto: _currentBackPhoto,
-        frontUrl: _currentFrontUrl, // ✅ Pass URL to model
-        backUrl: _currentBackUrl, // ✅ Pass URL to model
-      );
-
-      setState(() {
-        if (_editingIndex != null) {
-          _data.beneficiaries[_editingIndex!] = newPerson;
-        } else {
-          _data.beneficiaries.add(newPerson);
-        }
-      });
-
-      _resetForm();
+    // Validate relationship quietly
+    if (_selectedRelation == null) {
+      setState(() => _showRelationError = true);
+      isFormValid = false;
     }
+
+    // Validate photos quietly
+    bool hasFront = _currentFrontPhoto != null || _currentFrontUrl != null;
+    bool hasBack = _currentBackPhoto != null || _currentBackUrl != null;
+
+    if (_aadharController.text.isNotEmpty && (!hasFront || !hasBack)) {
+      setState(() => _showPhotoError = true);
+      isFormValid = false;
+    }
+
+    // If anything failed, silently stop (the red text will show on screen)
+    if (!isFormValid) {
+      return;
+    }
+
+    final newPerson = BeneficiaryInput(
+      id: _editingIndex != null
+          ? _data.beneficiaries[_editingIndex!].id
+          : DateTime.now().millisecondsSinceEpoch.toString(),
+      name: _nameController.text,
+      relation: _selectedRelation!,
+      dob: _dobController.text,
+      gender: _selectedGender,
+      aadhar: _aadharController.text,
+      frontPhoto: _currentFrontPhoto,
+      backPhoto: _currentBackPhoto,
+      frontUrl: _currentFrontUrl,
+      backUrl: _currentBackUrl,
+    );
+
+    setState(() {
+      if (_editingIndex != null) {
+        _data.beneficiaries[_editingIndex!] = newPerson;
+      } else {
+        _data.beneficiaries.add(newPerson);
+      }
+    });
+
+    _resetForm();
   }
 
   void _deleteBeneficiary(int index) {
@@ -231,11 +248,14 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   // 💾 LOGIC: CLOUD SAVE
   // ==========================================
   Future<void> _onNextPressed() async {
-    // <-- ADDED: Strongest way to kill keyboard
+    // Kill keyboard
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
-    setState(() => _isSaving = true);
+    setState(() {
+      _submitError = null;
+      _isSaving = true;
+    });
 
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -259,14 +279,14 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         }
 
         nomineesPayload.add({
-          'id': person.id, // Ensure ID goes into DB
+          'id': person.id,
           'name': person.name,
           'relation': person.relation,
           'dob': person.dob,
           'aadhaar': person.aadhar,
           'gender': person.gender,
-          'front_url': person.frontUrl, // ✅ Retain existing URL if present
-          'back_url': person.backUrl, // ✅ Retain existing URL if present
+          'front_url': person.frontUrl,
+          'back_url': person.backUrl,
           '_frontTask': frontUpload,
           '_backTask': backUpload,
         });
@@ -275,12 +295,10 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
         if (backUpload != null) uploadTasks.add(backUpload);
       }
 
-      // Execute all image uploads concurrently
       if (uploadTasks.isNotEmpty) {
         await Future.wait(uploadTasks);
       }
 
-      // Map the completed URLs back to the payload
       for (var payload in nomineesPayload) {
         if (payload['_frontTask'] != null) {
           payload['front_url'] = await payload['_frontTask'];
@@ -302,16 +320,16 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Error saving beneficiaries: $e")),
-        );
+        setState(() {
+          _isSaving = false;
+          _submitError =
+              "Failed to save data. Please check connection."; // ✅ Quiet inline error
+        });
       }
     }
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    // <-- ADDED: Prevent keyboard pop up on opening picker
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -329,7 +347,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       ),
     );
 
-    // <-- ADDED: Ensure keyboard stays closed when picker returns
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -345,9 +362,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   // ==========================================
   @override
   Widget build(BuildContext context) {
-    // ✅ MOVED: We no longer return a full Scaffold loader here.
-    // This allows the Wrapper and Card to build immediately.
-
     final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
     final double bottomPadding = keyboardHeight > 70
         ? keyboardHeight - 70
@@ -355,7 +369,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
 
     return WillPopScope(
       onWillPop: () async {
-        // <-- ADDED: Kill keyboard before going back via hardware button
         FocusManager.instance.primaryFocus?.unfocus();
         SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -364,14 +377,12 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       },
       child: RegistrationWrapper(
         onBack: () {
-          // <-- ADDED: Kill keyboard before going back via UI arrow
           FocusManager.instance.primaryFocus?.unfocus();
           SystemChannels.textInput.invokeMethod('TextInput.hide');
 
           Navigator.pop(context);
         },
         child: RegistrationCard(
-          // ✅ FIX: Show loader INSIDE the card if initializing
           child: _isInitializing
               ? const Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
@@ -410,14 +421,12 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                         padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          mainAxisAlignment: MainAxisAlignment
-                              .start, // ✅ Added start alignment
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             if (!_isAddingNew && _data.beneficiaries.isNotEmpty)
                               ListView.builder(
                                 shrinkWrap: true,
-                                padding: EdgeInsets
-                                    .zero, // ✅ Removes hidden Flutter ListView padding
+                                padding: EdgeInsets.zero,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: _data.beneficiaries.length,
                                 itemBuilder: (ctx, index) {
@@ -445,38 +454,59 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                     if (!_isAddingNew)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _onNextPressed,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                        child: Column(
+                          children: [
+                            // ✅ Quiet Inline Error for Server Failures
+                            if (_submitError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Center(
+                                  child: Text(
+                                    _submitError!,
+                                    style: GoogleFonts.roboto(
+                                      color: Colors.red,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: _isSaving ? null : _onNextPressed,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: _isSaving
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        _data.beneficiaries.isEmpty
+                                            ? "SKIP STEP"
+                                            : "NEXT: PAYMENT",
+                                        style: GoogleFonts.roboto(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
                               ),
                             ),
-                            child: _isSaving
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(
-                                    _data.beneficiaries.isEmpty
-                                        ? "SKIP STEP"
-                                        : "NEXT: PAYMENT",
-                                    style: GoogleFonts.roboto(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                          ),
+                          ],
                         ),
                       ),
                   ],
@@ -550,7 +580,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   }
 
   Widget _buildInputForm() {
-    // ✅ Include URLs in check
     bool isPhotosComplete =
         (_currentFrontPhoto != null || _currentFrontUrl != null) &&
         (_currentBackPhoto != null || _currentBackUrl != null);
@@ -568,6 +597,7 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       ),
       child: Form(
         key: _formKey,
+        // ✅ Errors only show up when the user hits "Add Member", NOT while typing!
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -595,6 +625,12 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
             RegistrationTextField(
               controller: _nameController,
               hint: "Full Name",
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+              ],
+              // ✅ FIXED: Using Validators
+              validator: (val) => Validators.validateRequired(val, "Name"),
             ),
             const SizedBox(height: 12),
 
@@ -611,6 +647,9 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                   hint: "Select Date",
                   readOnly: true,
                   suffixIcon: Icons.calendar_today_outlined,
+                  // ✅ FIXED: Using Validators
+                  validator: (val) =>
+                      Validators.validateRequired(val, "Date of Birth"),
                 ),
               ),
             ),
@@ -635,28 +674,40 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
               hint: "12 Digit Number",
               keyboardType: TextInputType.number,
               focusNode: _aadharFocusNode,
+              maxLength: 12,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               suffixIcon: isPhotosComplete
                   ? Icons.check_circle
                   : Icons.camera_alt_outlined,
               isSuffixSuccess: isPhotosComplete,
               onSuffixTap: () {
-                // <-- ADDED: Kill keyboard before ImagePicker
                 FocusManager.instance.primaryFocus?.unfocus();
                 SystemChannels.textInput.invokeMethod('TextInput.hide');
 
                 if (_currentFrontPhoto == null && _currentFrontUrl == null) {
                   ImagePickerUtils.showSourceSelection(
                     context,
-                    onImagePicked: (f) =>
-                        setState(() => _currentFrontPhoto = f),
+                    onImagePicked: (f) {
+                      setState(() {
+                        _currentFrontPhoto = f;
+                        _showPhotoError = false;
+                      });
+                    },
                   );
                 } else {
                   ImagePickerUtils.showSourceSelection(
                     context,
-                    onImagePicked: (f) => setState(() => _currentBackPhoto = f),
+                    onImagePicked: (f) {
+                      setState(() {
+                        _currentBackPhoto = f;
+                        _showPhotoError = false;
+                      });
+                    },
                   );
                 }
               },
+              // ✅ FIXED: Using Validators
+              validator: Validators.validateAadhaar,
             ),
 
             if (_currentFrontPhoto != null ||
@@ -671,13 +722,12 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                       child: DocumentThumbnail(
                         title: "Front",
                         file: _currentFrontPhoto,
-                        url: _currentFrontUrl, // ✅ Pass URL
+                        url: _currentFrontUrl,
                         onDelete: () => setState(() {
                           _currentFrontPhoto = null;
                           _currentFrontUrl = null;
                         }),
                         onTap: () {
-                          // <-- ADDED: Kill keyboard before ImagePicker
                           FocusManager.instance.primaryFocus?.unfocus();
                           SystemChannels.textInput.invokeMethod(
                             'TextInput.hide',
@@ -685,8 +735,12 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
 
                           ImagePickerUtils.showSourceSelection(
                             context,
-                            onImagePicked: (f) =>
-                                setState(() => _currentFrontPhoto = f),
+                            onImagePicked: (f) {
+                              setState(() {
+                                _currentFrontPhoto = f;
+                                _showPhotoError = false;
+                              });
+                            },
                           );
                         },
                       ),
@@ -696,13 +750,12 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
                       child: DocumentThumbnail(
                         title: "Back",
                         file: _currentBackPhoto,
-                        url: _currentBackUrl, // ✅ Pass URL
+                        url: _currentBackUrl,
                         onDelete: () => setState(() {
                           _currentBackPhoto = null;
                           _currentBackUrl = null;
                         }),
                         onTap: () {
-                          // <-- ADDED: Kill keyboard before ImagePicker
                           FocusManager.instance.primaryFocus?.unfocus();
                           SystemChannels.textInput.invokeMethod(
                             'TextInput.hide',
@@ -710,13 +763,31 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
 
                           ImagePickerUtils.showSourceSelection(
                             context,
-                            onImagePicked: (f) =>
-                                setState(() => _currentBackPhoto = f),
+                            onImagePicked: (f) {
+                              setState(() {
+                                _currentBackPhoto = f;
+                                _showPhotoError = false;
+                              });
+                            },
                           );
                         },
                       ),
                     ),
                   ],
+                ),
+              ),
+
+            // ✅ Quiet Inline Error for missing Photos
+            if (_showPhotoError)
+              Padding(
+                padding: const EdgeInsets.only(top: 12, left: 4),
+                child: Text(
+                  "Both Front and Back photos are required",
+                  style: GoogleFonts.roboto(
+                    color: Colors.red,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
 
@@ -750,7 +821,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   Widget _buildBigAddButton() {
     return GestureDetector(
       onTap: () {
-        // <-- ADDED: Kill keyboard
         FocusManager.instance.primaryFocus?.unfocus();
         SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -806,7 +876,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
       alignment: Alignment.centerRight,
       child: InkWell(
         onTap: () {
-          // <-- ADDED: Kill keyboard
           FocusManager.instance.primaryFocus?.unfocus();
           SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -843,37 +912,60 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
   }
 
   Widget _buildDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedRelation,
-          hint: Text(
-            "Select Relationship",
-            style: GoogleFonts.roboto(
-              color: AppColors.textSecondary,
-              fontSize: 14,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            // ✅ Turns border red if relationship is not selected
+            border: Border.all(
+              color: _showRelationError ? Colors.red : Colors.grey.shade300,
             ),
           ),
-          isExpanded: true,
-          items: _relations
-              .map(
-                (e) => DropdownMenuItem(
-                  value: e,
-                  child: Text(
-                    e,
-                    style: GoogleFonts.roboto(color: AppColors.textPrimary),
-                  ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedRelation,
+              hint: Text(
+                "Select Relationship",
+                style: GoogleFonts.roboto(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
                 ),
-              )
-              .toList(),
-          onChanged: (val) => setState(() => _selectedRelation = val),
+              ),
+              isExpanded: true,
+              items: _relations
+                  .map(
+                    (e) => DropdownMenuItem(
+                      value: e,
+                      child: Text(
+                        e,
+                        style: GoogleFonts.roboto(color: AppColors.textPrimary),
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (val) {
+                setState(() {
+                  _selectedRelation = val;
+                  _showRelationError =
+                      false; // ✅ Clears the error when they select one
+                });
+              },
+            ),
+          ),
         ),
-      ),
+        // ✅ Quiet Inline Error for Dropdown
+        if (_showRelationError)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              "Relationship is required",
+              style: GoogleFonts.roboto(color: Colors.red, fontSize: 11),
+            ),
+          ),
+      ],
     );
   }
 
@@ -881,7 +973,6 @@ class _BeneficiaryScreenState extends State<BeneficiaryScreen> {
     bool isSelected = _selectedGender == val;
     return GestureDetector(
       onTap: () {
-        // <-- ADDED: Kill keyboard
         FocusManager.instance.primaryFocus?.unfocus();
         SystemChannels.textInput.invokeMethod('TextInput.hide');
 

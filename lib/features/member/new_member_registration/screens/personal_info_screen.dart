@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/services.dart'; // <-- ADDED: Required for SystemChannels
+import 'package:flutter/services.dart';
 
 import 'package:member_management_app/routes/app_routes.dart';
 import '../../../../data/repositories/interfaces/member_repository.dart';
@@ -18,6 +18,8 @@ import '../widgets/document_thumbnail.dart';
 import '../widgets/image_picker_utils.dart';
 import '../registration_data_manager.dart';
 
+import '../../../../core/utils/validators.dart';
+
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -27,7 +29,7 @@ class PersonalInfoScreen extends StatefulWidget {
 
 class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _data = RegistrationDataManager(); // Singleton
+  final _data = RegistrationDataManager();
 
   final ImagePicker _picker = ImagePicker();
 
@@ -40,15 +42,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   bool _isSaving = false;
 
+  // ✅ ADDED: State variables for quiet inline errors (Replaces Snackbars)
+  bool _showPhotoError = false;
+  String? _submitError;
+
   @override
   void initState() {
     super.initState();
-    // 1. Auto-fill from Singleton (Loaded from Firestore or Memory)
     _nameController = TextEditingController(text: _data.name);
     _dobController = TextEditingController(text: _data.dob);
     _aadharController = TextEditingController(text: _data.aadharNumber);
 
-    // Ensure gender is set (Default 'Male' is handled in Singleton)
     if (_data.gender.isEmpty) _data.gender = 'Male';
 
     _retrieveLostData();
@@ -75,7 +79,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   void dispose() {
-    // Sync text back to singleton just in case
     _data.name = _nameController.text;
     _data.dob = _dobController.text;
     _data.aadharNumber = _aadharController.text;
@@ -92,23 +95,28 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   // 💾 LOGIC: SAVE & NEXT
   // ==========================================
   Future<void> _onNextPressed() async {
-    // <-- ADDED/MODIFIED: Strongest way to kill keyboard and clear focus memory
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
-    if (!_formKey.currentState!.validate()) return;
+    // ✅ Reset inline errors on new attempt
+    setState(() {
+      _showPhotoError = false;
+      _submitError = null;
+    });
 
-    // Check for EITHER local File OR existing Cloud URL
+    // Triggers inline red text in text fields silently
+    bool isFormValid = _formKey.currentState!.validate();
+
     bool hasFront = _data.aadharFront != null || _data.aadharFrontUrl != null;
     bool hasBack = _data.aadharBack != null || _data.aadharBackUrl != null;
 
     if (!hasFront || !hasBack) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please upload BOTH Front and Back of Aadhar Card"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setState(() => _showPhotoError = true); // ✅ Quiet inline error for photos
+      isFormValid = false;
+    }
+
+    // Stop silently if anything is invalid
+    if (!isFormValid) {
       return;
     }
 
@@ -116,20 +124,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
-      final repo = context.read<MemberRepository>(); // Get Repo Access
+      final repo = context.read<MemberRepository>();
 
-      // 1. Sync Text Data to Singleton
       _data.name = _nameController.text.trim();
       _data.dob = _dobController.text.trim();
       _data.aadharNumber = _aadharController.text.trim();
-      // _data.gender is updated via Radio buttons directly
 
-      // ---------------------------------------------------
-      // 2. UPLOAD IMAGES CONCURRENTLY (Optimized for speed)
-      // ---------------------------------------------------
       List<Future<void>> uploadTasks = [];
 
-      // Queue Front Upload
       if (_data.aadharFront != null) {
         uploadTasks.add(
           repo.uploadImage(uid, _data.aadharFront!, 'aadhar_front').then((url) {
@@ -138,7 +140,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         );
       }
 
-      // Queue Back Upload
       if (_data.aadharBack != null) {
         uploadTasks.add(
           repo.uploadImage(uid, _data.aadharBack!, 'aadhar_back').then((url) {
@@ -147,48 +148,40 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         );
       }
 
-      // Fire both uploads at the same time and wait once
       if (uploadTasks.isNotEmpty) {
         await Future.wait(uploadTasks);
       }
 
-      // ---------------------------------------------------
-      // 3. Prepare Payload (Save Draft)
-      // ---------------------------------------------------
-      // We save text details + URLs (if they exist).
       final draftData = {
-        'current_step': 2, // Move to Bank Step next time
+        'current_step': 2,
         'personal_details': {
           'name': _data.name,
           'dob': _data.dob,
           'gender': _data.gender,
           'aadhaar_no': _data.aadharNumber,
-          // ✅ We save the Cloud URLs, not the local files
           'aadhaar_front_url': _data.aadharFrontUrl,
           'aadhaar_back_url': _data.aadharBackUrl,
         },
       };
 
-      // 4. Save to Firestore
       await repo.saveMemberDraft(uid: uid, data: draftData);
 
-      // 5. Navigate
       if (mounted) {
         setState(() => _isSaving = false);
         Navigator.pushNamed(context, AppRoutes.registrationStep2);
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isSaving = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error saving draft: $e")));
+        setState(() {
+          _isSaving = false;
+          _submitError =
+              "Failed to save data. Check connection."; // ✅ Quiet inline error
+        });
       }
     }
   }
 
   Future<void> _handleExit() async {
-    // <-- ADDED/MODIFIED: Kill keyboard before dialog
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -282,7 +275,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    // <-- ADDED/MODIFIED: Prevent keyboard pop up on opening picker
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -299,7 +291,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       ),
     );
 
-    // <-- ADDED/MODIFIED: Ensure keyboard stays closed when picker returns
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -311,9 +302,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
-  // Helper to pick image
   void _pickImage(bool isFront) {
-    // <-- ADDED/MODIFIED: Kill keyboard completely before camera/gallery
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
@@ -326,6 +315,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           } else {
             _data.aadharBack = file;
           }
+          _showPhotoError = false; // Hide error once they pick a photo
         });
       },
     );
@@ -338,7 +328,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         ? keyboardHeight - 70
         : 20.0;
 
-    // ✅ Logic Update: Complete if (File exists OR Url exists)
     bool isAadharFrontDone =
         _data.aadharFront != null || _data.aadharFrontUrl != null;
     bool isAadharBackDone =
@@ -390,6 +379,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
                   child: Form(
                     key: _formKey,
+                    // ✅ Forces real-time inline validation as they type
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -397,6 +388,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         RegistrationTextField(
                           controller: _nameController,
                           hint: "Full Name",
+                          textCapitalization: TextCapitalization.words,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z\s]'),
+                            ),
+                          ],
+                          validator: (value) =>
+                              Validators.validateRequired(value, "Full Name"),
                         ),
                         const SizedBox(height: 16),
 
@@ -409,6 +408,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                               hint: "Select Date",
                               readOnly: true,
                               suffixIcon: Icons.calendar_today_outlined,
+                              validator: (value) => Validators.validateRequired(
+                                value,
+                                "Date of Birth",
+                              ),
                             ),
                           ),
                         ),
@@ -433,6 +436,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                           hint: "12 Digit Number",
                           keyboardType: TextInputType.number,
                           focusNode: _aadharFocusNode,
+                          maxLength: 12,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
                           suffixIcon: isAadharComplete
                               ? Icons.check_circle
                               : Icons.camera_alt_outlined,
@@ -444,9 +451,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                               _pickImage(false);
                             }
                           },
+                          validator: Validators.validateAadhaar,
                         ),
 
-                        // Show thumbnails if File OR URL exists
                         if (isAadharFrontDone || isAadharBackDone)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
@@ -456,7 +463,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                                   child: DocumentThumbnail(
                                     title: "Front Side",
                                     file: _data.aadharFront,
-                                    url: _data.aadharFrontUrl, // ✅ Added URL
+                                    url: _data.aadharFrontUrl,
                                     onDelete: () => setState(() {
                                       _data.aadharFront = null;
                                       _data.aadharFrontUrl = null;
@@ -469,7 +476,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                                   child: DocumentThumbnail(
                                     title: "Back Side",
                                     file: _data.aadharBack,
-                                    url: _data.aadharBackUrl, // ✅ Added URL
+                                    url: _data.aadharBackUrl,
                                     onDelete: () => setState(() {
                                       _data.aadharBack = null;
                                       _data.aadharBackUrl = null;
@@ -481,9 +488,40 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                             ),
                           ),
 
+                        // ✅ Quiet Inline Error for Photos
+                        if (_showPhotoError)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12, left: 4),
+                            child: Text(
+                              "Both Front and Back photos are required",
+                              style: GoogleFonts.roboto(
+                                color: Colors.red,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+
                         const SizedBox(height: 30),
 
-                        // ✅ NEXT BUTTON (Updated)
+                        // ✅ Quiet Inline Error for Form Submission failures
+                        if (_submitError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Center(
+                              child: Text(
+                                _submitError!,
+                                style: GoogleFonts.roboto(
+                                  color: Colors.red,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+
+                        // NEXT BUTTON
                         SizedBox(
                           width: double.infinity,
                           height: 48,
@@ -530,7 +568,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     bool isSelected = _data.gender == value;
     return GestureDetector(
       onTap: () {
-        // <-- ADDED/MODIFIED: Kill keyboard when tapping radio buttons
         FocusManager.instance.primaryFocus?.unfocus();
         SystemChannels.textInput.invokeMethod('TextInput.hide');
         setState(() => _data.gender = value);

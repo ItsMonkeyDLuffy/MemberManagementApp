@@ -18,6 +18,10 @@ import '../widgets/form_components.dart';
 // ✅ Logic
 import '../registration_data_manager.dart';
 
+// ✅ ADDED: Import your new Validators class here.
+// (Update this path to wherever your validators.dart file is saved!)
+import '../../../../core/utils/validators.dart';
+
 class BankDetailsScreen extends StatefulWidget {
   const BankDetailsScreen({super.key});
 
@@ -34,7 +38,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
   late TextEditingController _ifscCtrl;
   late TextEditingController _bankNameCtrl;
 
-  bool _isSaving = false; // ✅ Loader State
+  bool _isSaving = false;
+  String? _submitError; // ✅ ADDED: For quiet server errors
 
   @override
   void initState() {
@@ -74,6 +79,10 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
     FocusManager.instance.primaryFocus?.unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
 
+    setState(() {
+      _submitError = null;
+    });
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
@@ -110,10 +119,11 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isSaving = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error saving draft: $e")));
+        setState(() {
+          _isSaving = false;
+          _submitError =
+              "Failed to save bank details. Please check connection.";
+        });
       }
     }
   }
@@ -125,7 +135,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
         ? keyboardHeight - 70
         : 20.0;
 
-    // ✅ FIXED: WillPopScope to handle hardware back button correctly
+    // ✅ RESTORED: Your exact WillPopScope logic!
     return WillPopScope(
       onWillPop: () async {
         // <-- ADDED: Kill keyboard before going back via hardware button
@@ -181,6 +191,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                   padding: EdgeInsets.fromLTRB(20, 10, 20, bottomPadding),
                   child: Form(
                     key: _formKey,
+                    // ✅ FIXED: Removed autovalidateMode so errors ONLY show when "Next" is pressed
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -190,10 +201,12 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                           controller: _acNoCtrl,
                           hint: "Enter Account Number",
                           keyboardType: TextInputType.number,
-                          validator: (val) {
-                            if (val == null || val.isEmpty) return "Required";
-                            return null;
-                          },
+                          maxLength: 18,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          // ✅ FIXED: Replaced massive mistaken IFSC code block with correct Account validator
+                          validator: Validators.validateAccountNo,
                         ),
                         const SizedBox(height: 16),
 
@@ -203,13 +216,15 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                           controller: _confAcNoCtrl,
                           hint: "Re-enter Account Number",
                           keyboardType: TextInputType.number,
-                          validator: (val) {
-                            if (val == null || val.isEmpty) return "Required";
-                            if (val != _acNoCtrl.text) {
-                              return "Account numbers do not match";
-                            }
-                            return null;
-                          },
+                          maxLength: 18,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          validator: (val) =>
+                              Validators.validateConfirmAccountNo(
+                                val,
+                                _acNoCtrl.text,
+                              ),
                         ),
                         const SizedBox(height: 16),
 
@@ -217,12 +232,15 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         const RegistrationLabel("IFSC Code"),
                         RegistrationTextField(
                           controller: _ifscCtrl,
-                          hint: "Enter IFSC Code",
-                          // textCapitalization: TextCapitalization.characters, // RegistrationTextField might not support this directly, check implementation
-                          validator: (val) {
-                            if (val == null || val.isEmpty) return "Required";
-                            return null;
-                          },
+                          hint: "e.g. SBIN0001234",
+                          textCapitalization: TextCapitalization.characters,
+                          maxLength: 11,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z0-9]'),
+                            ),
+                          ],
+                          validator: Validators.validateIFSC,
                         ),
                         const SizedBox(height: 16),
 
@@ -231,14 +249,34 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         RegistrationTextField(
                           controller: _bankNameCtrl,
                           hint: "Enter Bank Name",
-                          // textCapitalization: TextCapitalization.words,
-                          validator: (val) {
-                            if (val == null || val.isEmpty) return "Required";
-                            return null;
-                          },
+                          textCapitalization: TextCapitalization.words,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z\s]'),
+                            ),
+                          ],
+                          validator: (val) =>
+                              Validators.validateRequired(val, "Bank Name"),
                         ),
 
                         const SizedBox(height: 30),
+
+                        // ✅ Quiet Inline Error for Server Failures
+                        if (_submitError != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Center(
+                              child: Text(
+                                _submitError!,
+                                style: GoogleFonts.roboto(
+                                  color: Colors.red,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
 
                         // ✅ NEXT BUTTON (Updated Logic)
                         SizedBox(

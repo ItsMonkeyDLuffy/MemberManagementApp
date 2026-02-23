@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // ✅ ADDED: Required for TextInputFormatter
 import 'package:google_fonts/google_fonts.dart';
 import '/core/constants/colors.dart';
 
@@ -37,6 +38,8 @@ class RegistrationTextField extends StatelessWidget {
   // ✅ NEW PARAMETERS ADDED
   final String? Function(String?)? validator;
   final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters; // ✅ ADDED
+  final int? maxLength; // ✅ ADDED
 
   const RegistrationTextField({
     super.key,
@@ -51,6 +54,8 @@ class RegistrationTextField extends StatelessWidget {
     // ✅ Initialize new params
     this.validator,
     this.textCapitalization = TextCapitalization.none,
+    this.inputFormatters, // ✅ ADDED
+    this.maxLength, // ✅ ADDED
   });
 
   @override
@@ -68,6 +73,10 @@ class RegistrationTextField extends StatelessWidget {
         readOnly: readOnly,
         // ✅ Apply Capitalization
         textCapitalization: textCapitalization,
+        // ✅ Apply Formatters and Length
+        inputFormatters: inputFormatters, // ✅ ADDED
+        maxLength: maxLength, // ✅ ADDED
+
         style: GoogleFonts.roboto(fontSize: 15, color: AppColors.textPrimary),
 
         // ✅ Use custom validator if provided, else fall back to default logic
@@ -75,11 +84,12 @@ class RegistrationTextField extends StatelessWidget {
             validator ??
             (val) {
               if (hint.contains("Optional")) return null;
-              return (val == null || val.isEmpty) ? "Required" : null;
+              return (val == null || val.trim().isEmpty) ? "Required" : null;
             },
 
         decoration: InputDecoration(
           hintText: hint,
+          counterText: "", // ✅ Hides the character counter for a cleaner look
           hintStyle: GoogleFonts.roboto(
             color: AppColors.textSecondary,
             fontSize: 14,
@@ -90,6 +100,10 @@ class RegistrationTextField extends StatelessWidget {
             horizontal: 12,
             vertical: 12,
           ),
+
+          // ✅ Internal Error Styling (Quiet Red Lines)
+          errorStyle: GoogleFonts.roboto(color: Colors.red, fontSize: 10.5),
+
           suffixIcon: suffixIcon != null
               ? IconButton(
                   onPressed: onSuffixTap,
@@ -110,13 +124,15 @@ class RegistrationTextField extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             borderSide: const BorderSide(color: AppColors.primary),
           ),
+
+          // ✅ Red Borders for Error State
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: Colors.red),
+            borderSide: const BorderSide(color: Colors.red, width: 1.0),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
-            borderSide: const BorderSide(color: Colors.red),
+            borderSide: const BorderSide(color: Colors.red, width: 1.5),
           ),
         ),
       ),

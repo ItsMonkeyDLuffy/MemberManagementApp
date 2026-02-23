@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart'; // <-- ADDED: Required for SystemChannels
 
 import '../../../../core/constants/colors.dart';
 
@@ -30,8 +31,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isInfoConfirmed = false;
   bool _isProcessing = false; // ✅ Loading State
 
+  String? _submitError; // ✅ ADDED: For quiet inline errors
+
   Future<void> _handlePayment() async {
-    setState(() => _isProcessing = true);
+    // <-- ADDED: Safety check to kill keyboard if it stayed open from Step 3
+    FocusManager.instance.primaryFocus?.unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
+
+    setState(() {
+      _submitError = null;
+      _isProcessing = true;
+    });
 
     try {
       // 1. SIMULATE PAYMENT GATEWAY
@@ -60,6 +70,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
       // 4. NAVIGATE TO HOME (Clear History)
       if (mounted) {
+        // ✅ Kept the Green Success Snackbar because they are moving to the Home Screen
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Payment Successful! Application Submitted."),
@@ -76,13 +87,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Payment Failed: $e"),
-            backgroundColor: Colors.red, // Using standard color for safety
-          ),
-        );
+        setState(() {
+          _isProcessing = false;
+          // ✅ FIXED: Replaced red snackbar with quiet inline error
+          _submitError = "Payment Failed: Please try again.";
+        });
       }
     }
   }
@@ -95,16 +104,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ FIXED: WillPopScope to handle hardware back button correctly
     return WillPopScope(
       onWillPop: () async {
+        // <-- ADDED: Safety kill keyboard before going back
+        FocusManager.instance.primaryFocus?.unfocus();
+        SystemChannels.textInput.invokeMethod('TextInput.hide');
         Navigator.pop(context); // Go back to Step 3
         return false; // Prevent App Exit
       },
       child: RegistrationWrapper(
-        // ✅ FIXED: Simple Pop for App Bar Arrow
-        onBack: () => Navigator.pop(context),
-
+        onBack: () {
+          // <-- ADDED: Safety kill keyboard before going back
+          FocusManager.instance.primaryFocus?.unfocus();
+          SystemChannels.textInput.invokeMethod('TextInput.hide');
+          Navigator.pop(context);
+        },
         child: RegistrationCard(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 25, 20, 20),
@@ -254,6 +268,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ],
                   ),
                 ),
+
+                // ✅ Quiet Inline Error for Payment Failures
+                if (_submitError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Center(
+                      child: Text(
+                        _submitError!,
+                        style: GoogleFonts.roboto(
+                          color: Colors.red,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
 
                 // --- BOTTOM BUTTON & TERMS ---
                 SizedBox(

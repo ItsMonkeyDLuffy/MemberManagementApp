@@ -10,6 +10,7 @@ class UserModel {
   // App Logic Fields
   final String role; // 'member', 'admin'
   final String status; // 'INCOMPLETE', 'PENDING_APPROVAL', 'ACTIVE', 'REJECTED'
+  final String? paymentStatus; // ✅ ADDED
   final int currentStep; // 1: Personal, 2: Bank, 3: Nominee, 4: Payment
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -27,6 +28,7 @@ class UserModel {
     this.regId, // ✅ ADDED
     this.role = 'member',
     this.status = 'INCOMPLETE',
+    this.paymentStatus, // ✅ ADDED
     this.currentStep = 1,
     required this.createdAt,
     required this.updatedAt,
@@ -44,6 +46,7 @@ class UserModel {
       'reg_id': regId, // ✅ SAVES TO DB
       'role': role,
       'status': status,
+      if (paymentStatus != null) 'payment_status': paymentStatus, // ✅ ADDED
       'current_step': currentStep,
       'created_at': Timestamp.fromDate(createdAt),
       'updated_at': Timestamp.fromDate(updatedAt),
@@ -66,7 +69,11 @@ class UserModel {
       memberId: map['member_id'],
       regId: map['reg_id'], // ✅ LOADS FROM DB
       role: map['role'] ?? 'member',
-      status: map['status'] ?? 'INCOMPLETE',
+
+      // ✅ FIX: Automatically removes trailing spaces from status
+      status: (map['status'] ?? 'INCOMPLETE').toString().trim(),
+      paymentStatus: map['payment_status'], // ✅ ADDED
+
       currentStep: map['current_step'] ?? 1,
 
       createdAt: (map['created_at'] as Timestamp).toDate(),
@@ -103,6 +110,7 @@ class UserModel {
     String? regId,
     String? role,
     String? status,
+    String? paymentStatus, // ✅ ADDED
     int? currentStep,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -117,6 +125,7 @@ class UserModel {
       regId: regId ?? this.regId,
       role: role ?? this.role,
       status: status ?? this.status,
+      paymentStatus: paymentStatus ?? this.paymentStatus, // ✅ ADDED
       currentStep: currentStep ?? this.currentStep,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

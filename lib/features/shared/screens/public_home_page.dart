@@ -6,6 +6,7 @@ import '../../../core/widgets/gradient_background.dart';
 import '../../../core/widgets/dharma_app_bar.dart';
 import '../../../core/enums/app_bar_type.dart';
 import 'package:member_management_app/routes/app_routes.dart'; // Adjust path as needed
+import 'dart:math' as math;
 
 class PublicHomePage extends StatelessWidget {
   const PublicHomePage({super.key});
@@ -80,7 +81,7 @@ class PublicHomePage extends StatelessWidget {
               // ===============================
               // 5. FOOTER (SOCIAL PLACEHOLDER)
               // ===============================
-              _buildFooter(),
+              _buildFooter(context),
             ],
           ),
         ),
@@ -309,46 +310,58 @@ class PublicHomePage extends StatelessWidget {
   // ======================================================
   // FOOTER
   // ======================================================
-  Widget _buildFooter() {
+  // ======================================================
+  // FOOTER
+  // ======================================================
+  Widget _buildFooter(BuildContext context) {
+    // ✅ FIX 1: Pass BuildContext
     const Color iconColor = Color(0xFFFF9641);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // YouTube
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.youtube),
-          color: iconColor, // Official YouTube Red
-          iconSize: 25,
-          onPressed: () {},
-        ),
-        const SizedBox(width: 4),
 
-        // Facebook
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.facebook),
-          color: iconColor, // Official Facebook Blue
-          iconSize: 25,
-          onPressed: () {},
-        ),
-        const SizedBox(width: 4),
+    // ✅ FIX 2: Wrap the Row in Padding
+    return Padding(
+      padding: EdgeInsets.only(
+        // Dynamically add the height of the phone's nav bar + a little extra space
+        bottom: math.max(0.0, MediaQuery.of(context).padding.bottom - 10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // YouTube
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.youtube),
+            color: iconColor, // Official YouTube Red
+            iconSize: 25,
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
 
-        // Instagram
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.instagram),
-          color: iconColor, // Official Insta Pink/Red
-          iconSize: 25,
-          onPressed: () {},
-        ),
-        const SizedBox(width: 4),
+          // Facebook
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.facebook),
+            color: iconColor, // Official Facebook Blue
+            iconSize: 25,
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
 
-        // X (formerly Twitter)
-        IconButton(
-          icon: const FaIcon(FontAwesomeIcons.xTwitter),
-          color: iconColor, // Official X Black
-          iconSize: 25,
-          onPressed: () {},
-        ),
-      ],
+          // Instagram
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.instagram),
+            color: iconColor, // Official Insta Pink/Red
+            iconSize: 25,
+            onPressed: () {},
+          ),
+          const SizedBox(width: 4),
+
+          // X (formerly Twitter)
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.xTwitter),
+            color: iconColor, // Official X Black
+            iconSize: 25,
+            onPressed: () {},
+          ),
+        ],
+      ),
     );
   }
 }
