@@ -170,12 +170,23 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         setState(() => _isSaving = false);
         Navigator.pushNamed(context, AppRoutes.registrationStep2);
       }
-    } catch (e) {
+    } catch (e, stacktrace) {
+      // ✅ 1. Print the REAL error to your terminal so you can actually see it!
+      debugPrint("🚨 FIREBASE SAVE ERROR: $e");
+      debugPrint("🚨 STACKTRACE: $stacktrace");
+
       if (mounted) {
         setState(() {
           _isSaving = false;
-          _submitError =
-              "Failed to save data. Check connection."; // ✅ Quiet inline error
+
+          // ✅ 2. Show a slightly smarter UI error
+          if (e.toString().contains('permission-denied')) {
+            _submitError = "Permission denied. Check database rules.";
+          } else if (e.toString().contains('network')) {
+            _submitError = "Network error. Please check your internet.";
+          } else {
+            _submitError = "Something went wrong. Please try again.";
+          }
         });
       }
     }

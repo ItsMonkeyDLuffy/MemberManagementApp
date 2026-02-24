@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ Added for session check
 
 // ✅ Core Imports
 import '../../../core/constants/colors.dart';
@@ -17,10 +18,19 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // ⏳ Wait 3 seconds, then Navigate
+    // ⏳ Wait 3 seconds, then Navigate based on Auth Status
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.publicHome);
+        // ✅ NEW LOGIC: Check if user is already logged in
+        final user = FirebaseAuth.instance.currentUser;
+
+        if (user != null) {
+          // 🚀 Already Logged In: Go to AuthWrapper (Login Route)
+          Navigator.pushReplacementNamed(context, AppRoutes.login);
+        } else {
+          // 🏠 Not Logged In: Go to Public Home Page
+          Navigator.pushReplacementNamed(context, AppRoutes.publicHome);
+        }
       }
     });
   }
@@ -31,14 +41,13 @@ class _SplashScreenState extends State<SplashScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      // We don't use backgroundColor here because the Container gradient covers it
       body: SafeArea(
         top: true,
         bottom: false,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 🔶 1. Gradient Background (Updated to use AppColors)
+            // 🔶 1. Gradient Background
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -46,49 +55,43 @@ class _SplashScreenState extends State<SplashScreen> {
                   end: Alignment.bottomCenter,
                   stops: [0.0, 0.44, 0.88],
                   colors: [
-                    AppColors.primary, // Top: Saffron
-                    Color(0xFFFFDB8E), // Mid: Bridge Color
-                    AppColors.primaryLight, // Bottom: Cream
+                    AppColors.primary,
+                    Color(0xFFFFDB8E),
+                    AppColors.primaryLight,
                   ],
                 ),
               ),
             ),
 
-            // 🚩 2. Background Flag (MANUALLY PULLED LEFT)
+            // 🚩 2. Background Flag
             Positioned(
               top: 0,
               bottom: 0,
-              // 🔥 KEY FIX: Pull image 55px to the left to hide transparent gap
               left: -55,
-              // Increase width slightly so it doesn't shrink
               width: screenWidth + 60,
               child: Opacity(
-                opacity: 0.3, // Your requested opacity
+                opacity: 0.3,
                 child: Image.asset(
-                  'assets/images/saffron_flag_bg.png', // Ensure this file exists
+                  'assets/images/saffron_flag_bg.png',
                   fit: BoxFit.cover,
                   alignment: Alignment.topLeft,
                 ),
               ),
             ),
 
-            // 🕉️ 3. Center Text (Size 64, Stroke 3)
+            // 🕉️ 3. Center Text
             Center(
               child: Stack(
                 children: [
-                  // Layer A: White Stroke
                   Text(
                     'धर्म योद्धा',
                     style: GoogleFonts.anekDevanagari(
-                      fontSize: 64, // ✅ Kept your size
+                      fontSize: 64,
                       fontWeight: FontWeight.bold,
                       foreground: Paint()
                         ..style = PaintingStyle.stroke
-                        ..strokeWidth =
-                            3 // ✅ Kept your stroke weight
-                        ..color = AppColors.white.withValues(
-                          alpha: 0.9,
-                        ), // ✅ Using AppColors
+                        ..strokeWidth = 3
+                        ..color = AppColors.white.withValues(alpha: 0.9),
                       shadows: const [
                         Shadow(
                           offset: Offset(2, 4),
@@ -98,13 +101,12 @@ class _SplashScreenState extends State<SplashScreen> {
                       ],
                     ),
                   ),
-                  // Layer B: Orange Fill
                   Text(
                     'धर्म योद्धा',
                     style: GoogleFonts.anekDevanagari(
-                      fontSize: 64, // ✅ Kept your size
+                      fontSize: 64,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary, // ✅ Using AppColors.primary
+                      color: AppColors.primary,
                     ),
                   ),
                 ],

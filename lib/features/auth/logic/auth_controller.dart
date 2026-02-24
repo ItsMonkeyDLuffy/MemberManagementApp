@@ -22,7 +22,6 @@ class AuthController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  // ✅ ADDED: This clears the error from memory when navigating back
   void clearError() {
     if (_errorMessage != null) {
       _errorMessage = null;
@@ -30,7 +29,6 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // ✅ ADDED: Filter to translate ugly Firebase errors into clean UI text
   String _cleanErrorMessage(dynamic e) {
     String error = e.toString();
     if (error.contains('invalid-verification-code')) {
@@ -47,9 +45,30 @@ class AuthController extends ChangeNotifier {
     return "Something went wrong. Please try again.";
   }
 
-  // ==========================================
-  // 1️⃣ SEND OTP
-  // ==========================================
+  // ✅ ADDED: Startup routing logic for AuthWrapper
+  Future<String> getInitialRoute(String uid) async {
+    try {
+      UserModel? existingUser = await _memberRepository.getUserDetails(uid);
+
+      if (existingUser != null) {
+        if (existingUser.status == 'ACTIVE' ||
+            existingUser.status == 'PENDING_APPROVAL' ||
+            existingUser.paymentStatus == 'COMPLETED') {
+          RegistrationDataManager().clearData();
+          return AppRoutes.memberHome;
+        } else {
+          RegistrationDataManager().loadFromModel(existingUser);
+          return AppRoutes.registrationStep1;
+        }
+      } else {
+        return AppRoutes.registrationStep1;
+      }
+    } catch (e) {
+      debugPrint("Auth Error: $e");
+      return AppRoutes.login;
+    }
+  }
+
   Future<void> loginWithPhone(String phone, VoidCallback onSuccess) async {
     _isLoading = true;
     _errorMessage = null;
@@ -65,23 +84,18 @@ class AuthController extends ChangeNotifier {
           onSuccess();
         },
         onError: (msg) {
-          // ✅ Clean the error before it hits the UI
           _errorMessage = _cleanErrorMessage(msg);
           _isLoading = false;
           notifyListeners();
         },
       );
     } catch (e) {
-      // ✅ Clean the error before it hits the UI
       _errorMessage = _cleanErrorMessage(e);
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // ==========================================
-  // 2️⃣ VERIFY OTP & ROUTE USER
-  // ==========================================
   Future<void> verifyOtp(
     String otp,
     Function(String routeName) onNavigate,
@@ -89,7 +103,7 @@ class AuthController extends ChangeNotifier {
     if (_verificationId == null) return;
 
     _isLoading = true;
-    _errorMessage = null; // ✅ Clear old errors on new attempt
+    _errorMessage = null;
     notifyListeners();
 
     try {
@@ -104,7 +118,6 @@ class AuthController extends ChangeNotifier {
         );
 
         if (existingUser != null) {
-          // --- SCENARIO 1: EXISTING USER ---
           if (existingUser.status == 'ACTIVE' ||
               existingUser.status == 'PENDING_APPROVAL' ||
               existingUser.paymentStatus == 'COMPLETED') {
@@ -113,17 +126,12 @@ class AuthController extends ChangeNotifier {
             notifyListeners();
             onNavigate(AppRoutes.memberHome);
           } else {
-            // ⚠️ INCOMPLETE APPLICATION -> RESUME DRAFT
             RegistrationDataManager().loadFromModel(existingUser);
-
             _isLoading = false;
             notifyListeners();
-
-            // ✅ BULLETPROOF FIX: Always navigate to Step 1
             onNavigate(AppRoutes.registrationStep1);
           }
         } else {
-          // --- SCENARIO 2: NEW USER ---
           final newUser = UserModel(
             uid: firebaseUser.uid,
             mobileNo: firebaseUser.mobileNo,
@@ -147,7 +155,6 @@ class AuthController extends ChangeNotifier {
       }
     } catch (e) {
       _isLoading = false;
-      // ✅ Clean the error before it hits the UI
       _errorMessage = _cleanErrorMessage(e);
       notifyListeners();
     }

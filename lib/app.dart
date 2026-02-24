@@ -17,13 +17,13 @@ class MyApp extends StatelessWidget {
 
       // ✅ CHANGE 1: Use initialRoute instead of home
       // This looks up '/' in your AppRoutes.routes map
-      initialRoute: AppRoutes.splash, 
+      initialRoute: AppRoutes.splash,
 
       // ✅ CHANGE 2: Link the routes map
       routes: AppRoutes.routes,
 
       // ✅ CHANGE 3: Handle the OTP Screen separately
-      // Because OtpScreen requires a 'mobileNumber' parameter, 
+      // Because OtpScreen requires a 'mobileNumber' parameter,
       // we handle it here to pass data during navigation.
       onGenerateRoute: (settings) {
         if (settings.name == AppRoutes.otp) {
